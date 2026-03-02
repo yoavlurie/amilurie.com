@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LEGO Logic — Ami Lurie</title>
+  <meta name="description" content="LEGO Logic: a mastermind-style logic puzzle game by Ami Lurie.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../games.html">Games</a></li>
+        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="../adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>LEGO Logic</h1>
+          <p>Crack the hidden code. Arrange 4 colored blocks in the correct secret order using logic and deduction.</p>
+        </header>
+
+        <div class="game-area" id="game-area">
+          <p class="feedback-text" id="feedback" aria-live="polite">Select blocks to fill the 4 slots. Then check your guess.</p>
+
+          <div class="lego-board" id="board" aria-label="Your guess slots">
+            <div class="lego-slot" data-slot="0"></div>
+            <div class="lego-slot" data-slot="1"></div>
+            <div class="lego-slot" data-slot="2"></div>
+            <div class="lego-slot" data-slot="3"></div>
+          </div>
+
+          <div class="lego-palette" id="palette" aria-label="Available blocks">
+            <button class="lego-block" data-color="red" type="button" aria-label="Red block">&#128308;</button>
+            <button class="lego-block" data-color="blue" type="button" aria-label="Blue block">&#128309;</button>
+            <button class="lego-block" data-color="green" type="button" aria-label="Green block">&#128994;</button>
+            <button class="lego-block" data-color="yellow" type="button" aria-label="Yellow block">&#128993;</button>
+          </div>
+
+          <div class="text-center" id="controls">
+            <div class="btn-group" style="justify-content:center;">
+              <button class="btn btn-primary" id="check-btn" type="button" disabled>Check Guess</button>
+              <button class="btn btn-secondary" id="clear-btn" type="button">Clear</button>
+              <button class="btn btn-secondary" id="new-game-btn" type="button">New Game</button>
+            </div>
+          </div>
+
+          <div class="mt-lg text-center" id="attempts-display">
+            <p style="color:var(--color-text-muted); font-size:0.9rem;">Attempts: <strong id="attempt-count">0</strong></p>
+          </div>
+
+          <div id="win-message" class="hidden mt-lg text-center">
+            <h2 style="color:#2d8a4e; font-size:1.5rem;">Code Cracked!</h2>
+            <p style="color:var(--color-text-muted);" id="win-text"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/script.js" defer></script>
+  <script src="../assets/games.js" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      var COLORS = ["red", "blue", "green", "yellow"];
+      var EMOJIS = { red: "\uD83D\uDD34", blue: "\uD83D\uDD35", green: "\uD83D\uDFE2", yellow: "\uD83D\uDFE1" };
+      var SECRET = [];
+      var guess = [null, null, null, null];
+      var currentSlot = 0;
+      var attempts = 0;
+      var solved = false;
+
+      var slots = document.querySelectorAll(".lego-slot");
+      var blocks = document.querySelectorAll(".lego-block");
+      var checkBtn = document.getElementById("check-btn");
+      var clearBtn = document.getElementById("clear-btn");
+      var newGameBtn = document.getElementById("new-game-btn");
+      var feedback = document.getElementById("feedback");
+      var attemptCount = document.getElementById("attempt-count");
+      var winMessage = document.getElementById("win-message");
+      var winText = document.getElementById("win-text");
+
+      function newGame() {
+        SECRET = GameUtils.shuffleArray(COLORS);
+        guess = [null, null, null, null];
+        currentSlot = 0;
+        attempts = 0;
+        solved = false;
+
+        attemptCount.textContent = "0";
+        feedback.textContent = "Select blocks to fill the 4 slots. Then check your guess.";
+        winMessage.classList.add("hidden");
+        checkBtn.disabled = true;
+
+        slots.forEach(function (slot) {
+          slot.textContent = "";
+          slot.className = "lego-slot";
+        });
+      }
+
+      function placeBlock(color) {
+        if (solved || currentSlot >= 4) return;
+
+        guess[currentSlot] = color;
+        slots[currentSlot].textContent = EMOJIS[color];
+        slots[currentSlot].classList.add("filled");
+        currentSlot++;
+
+        if (currentSlot === 4) {
+          checkBtn.disabled = false;
+        }
+      }
+
+      function clearGuess() {
+        if (solved) return;
+        guess = [null, null, null, null];
+        currentSlot = 0;
+        checkBtn.disabled = true;
+
+        slots.forEach(function (slot) {
+          slot.textContent = "";
+          slot.className = "lego-slot";
+        });
+      }
+
+      function checkGuess() {
+        if (solved || currentSlot < 4) return;
+
+        attempts++;
+        attemptCount.textContent = attempts;
+
+        var correctPosition = 0;
+        var correctColor = 0;
+        var secretCopy = SECRET.slice();
+        var guessCopy = guess.slice();
+
+        // First pass: correct position
+        for (var i = 0; i < 4; i++) {
+          if (guessCopy[i] === secretCopy[i]) {
+            correctPosition++;
+            slots[i].classList.add("correct");
+            secretCopy[i] = null;
+            guessCopy[i] = null;
+          }
+        }
+
+        // Second pass: correct color wrong position
+        for (var j = 0; j < 4; j++) {
+          if (guessCopy[j] === null) continue;
+          var idx = secretCopy.indexOf(guessCopy[j]);
+          if (idx !== -1) {
+            correctColor++;
+            slots[j].classList.add("wrong-position");
+            secretCopy[idx] = null;
+          } else {
+            slots[j].classList.add("incorrect");
+          }
+        }
+
+        if (correctPosition === 4) {
+          solved = true;
+          feedback.textContent = "";
+          winMessage.classList.remove("hidden");
+          winText.textContent = "You cracked the code in " + attempts + (attempts === 1 ? " attempt!" : " attempts!");
+          checkBtn.disabled = true;
+        } else {
+          var hints = [];
+          if (correctPosition > 0) hints.push(correctPosition + " in the right spot");
+          if (correctColor > 0) hints.push(correctColor + " right color, wrong spot");
+          if (correctPosition === 0 && correctColor === 0) hints.push("No matches");
+          feedback.textContent = hints.join(". ") + ". Try again!";
+
+          // Reset for next guess after short delay
+          setTimeout(function () {
+            if (!solved) clearGuess();
+          }, 1500);
+        }
+      }
+
+      blocks.forEach(function (block) {
+        block.addEventListener("click", function () {
+          placeBlock(block.getAttribute("data-color"));
+        });
+      });
+
+      checkBtn.addEventListener("click", checkGuess);
+      clearBtn.addEventListener("click", clearGuess);
+      newGameBtn.addEventListener("click", newGame);
+
+      newGame();
+    });
+  </script>
+</body>
+</html>

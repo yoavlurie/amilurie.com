@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Long Adventure — Ami Lurie</title>
+  <meta name="description" content="A long-form interactive mythology-inspired adventure game by Ami Lurie.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="games.html">Games</a></li>
+        <li><a href="myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="adventure.html" aria-current="page">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>The Long Adventure</h1>
+          <p>A mythology-inspired interactive adventure game currently in development. Below is a playable demo of the opening sequence.</p>
+        </header>
+
+        <div class="adventure-panel" id="adventure-panel">
+          <div class="story-text" id="story-text" aria-live="polite"></div>
+          <div class="adventure-choices" id="choices"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="assets/script.js" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      var storyText = document.getElementById("story-text");
+      var choicesEl = document.getElementById("choices");
+
+      var scenes = {
+        start: {
+          text: "You stand at the entrance of an ancient temple carved into the mountainside. Torchlight flickers from within, casting long shadows across stone walls covered in forgotten runes. The air smells of damp earth and something older \u2014 something powerful. A narrow path descends into darkness ahead. To your right, a crumbling staircase spirals upward into the mountain itself.",
+          choices: [
+            { text: "Descend into the darkness", next: "descent" },
+            { text: "Climb the crumbling staircase", next: "climb" }
+          ]
+        },
+        descent: {
+          text: "The passage narrows as you descend. Your footsteps echo against wet stone. The torches on the walls grow fewer until only a faint blue glow lights the way \u2014 bioluminescent moss clinging to the ceiling like scattered stars. You reach a fork. To the left, you hear the sound of rushing water. To the right, a faint humming, almost like a voice singing in a language you have never heard.",
+          choices: [
+            { text: "Follow the sound of water", next: "water" },
+            { text: "Follow the humming voice", next: "voice" }
+          ]
+        },
+        climb: {
+          text: "The staircase groans under your weight. Dust falls from above as you climb higher. At the top, you emerge into a vast open chamber. Moonlight pours through a crack in the ceiling, illuminating a stone pedestal at the center. On the pedestal sits a bronze compass, its needle spinning slowly. Behind the pedestal, a mosaic on the wall depicts a great battle between gods and titans. One section of the mosaic appears loose.",
+          choices: [
+            { text: "Take the bronze compass", next: "compass" },
+            { text: "Investigate the loose mosaic tile", next: "mosaic" }
+          ]
+        },
+        water: {
+          text: "You follow the sound until the passage opens into a cavern split by an underground river. The water is black and fast, carrying glimmers of reflected light from crystals embedded in the walls. A stone bridge stretches across, ancient but intact. On the far side, you see the outline of a doorway carved with symbols of protection. You feel a deep certainty: whatever lies beyond that door has been waiting for a long time.",
+          choices: [
+            { text: "Cross the bridge", next: "ending_bridge" },
+            { text: "Search the near side of the river first", next: "ending_search" }
+          ]
+        },
+        voice: {
+          text: "The humming grows louder as you approach. The tunnel widens into a small shrine. In the center, a figure made entirely of woven silver threads floats above the ground, eyes closed, mouth moving with the song. The melody tugs at something in your memory \u2014 a lullaby you heard as a child, though you cannot remember who sang it. The figure opens its eyes and looks directly at you.",
+          choices: [
+            { text: "Speak to the figure", next: "ending_speak" },
+            { text: "Listen to the full song", next: "ending_listen" }
+          ]
+        },
+        compass: {
+          text: "The moment your fingers touch the compass, its needle stops spinning and points firmly toward the mosaic wall. The bronze grows warm in your hand. Somewhere deep below the mountain, something shifts \u2014 a low rumble, like a door opening after centuries. The compass is not just a tool. It is a key. And whatever it unlocks has just begun to wake.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        },
+        mosaic: {
+          text: "You press the loose tile and it sinks into the wall with a click. The entire mosaic begins to shift \u2014 tiles rearranging themselves like a living puzzle. When they settle, the image has changed. It no longer shows a battle. It shows a map \u2014 the mountain from above, with paths you have never seen marked in glowing blue lines. One path leads deep underground. Another leads to a peak surrounded by storm clouds. A third points toward the sea. The adventure has just begun.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        },
+        ending_bridge: {
+          text: "You cross the stone bridge. Each step feels deliberate, as though the bridge is testing your resolve. On the other side, the carved doorway pulses with a faint warmth. You push it open and step into a chamber filled with golden light. In its center floats an ancient scroll, unrolling itself slowly, revealing words in a language that somehow you can read. The first line says: \"You who have crossed the deep water \u2014 the trials ahead are yours to shape.\" This is only the beginning.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        },
+        ending_search: {
+          text: "You search along the riverbank and find a small alcove hidden behind a curtain of moss. Inside, scratched into the stone, is a message: \"The door opens for those who bring light, not force.\" Tucked into a crack in the wall is a small crystal that glows faintly when you hold it. You pocket it and stand, knowing it will matter later. Sometimes the wisest path is the patient one.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        },
+        ending_speak: {
+          text: "\"I have been waiting,\" the figure says, its voice layered with echoes. \"Not for anyone. For you.\" It extends a silver hand, and in its palm rests a single seed \u2014 dark as obsidian, warm as sunlight. \"Plant this where the rivers meet, and the old world will remember what it lost.\" The figure dissolves into threads of light, and the seed remains. Your quest has a purpose now.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        },
+        ending_listen: {
+          text: "You sit and listen. The song washes over you like a tide, filling the chamber with warmth. Images flash through your mind \u2014 a great tree with roots that reach through the earth, a city built on clouds, a battle fought with words instead of weapons. When the song ends, the figure smiles and fades. But the knowledge remains. You understand things now that you did not before. The mountain is alive. And it has chosen you as its witness.",
+          choices: [
+            { text: "Restart the adventure", next: "start" }
+          ]
+        }
+      };
+
+      function renderScene(sceneKey) {
+        var scene = scenes[sceneKey];
+        if (!scene) return;
+
+        storyText.textContent = scene.text;
+
+        choicesEl.innerHTML = "";
+        scene.choices.forEach(function (choice) {
+          var btn = document.createElement("button");
+          btn.className = "btn btn-secondary";
+          btn.textContent = choice.text;
+          btn.type = "button";
+          btn.addEventListener("click", function () {
+            renderScene(choice.next);
+          });
+          choicesEl.appendChild(btn);
+        });
+      }
+
+      renderScene("start");
+    });
+  </script>
+</body>
+</html>

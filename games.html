@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Games — Ami Lurie</title>
+  <meta name="description" content="Interactive browser games by Ami Lurie — typing duels, myth forges, logic puzzles, and more.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="games.html" aria-current="page">Games</a></li>
+        <li><a href="myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>Games</h1>
+          <p>A collection of interactive browser games — each one built from scratch.</p>
+        </header>
+
+        <div class="card-grid">
+
+          <a href="games/typing-duel.html" class="card" aria-label="Play Typing Duel">
+            <div class="card-icon" aria-hidden="true">&#9876;</div>
+            <h3>Typing Duel</h3>
+            <p>A fast-paced word wizard duel. Type the passage before time runs out and claim your battle results.</p>
+            <span class="card-link">Play</span>
+          </a>
+
+          <a href="games/myth-builder.html" class="card" aria-label="Play Myth Builder">
+            <div class="card-icon" aria-hidden="true">&#128220;</div>
+            <h3>Myth Builder</h3>
+            <p>Forge a random mythological premise — combine heroes, powers, monsters, and prophecies into a new legend.</p>
+            <span class="card-link">Play</span>
+          </a>
+
+          <a href="games/lego-logic.html" class="card" aria-label="Play LEGO Logic">
+            <div class="card-icon" aria-hidden="true">&#129521;</div>
+            <h3>LEGO Logic</h3>
+            <p>Crack the hidden code. Arrange colored blocks in the right order using logic and deduction.</p>
+            <span class="card-link">Play</span>
+          </a>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="assets/script.js" defer></script>
+</body>
+</html>

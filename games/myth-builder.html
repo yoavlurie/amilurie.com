@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Myth Builder — Ami Lurie</title>
+  <meta name="description" content="Myth Builder: forge a random mythological premise by combining heroes, powers, monsters, and prophecies.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../games.html">Games</a></li>
+        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="../adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>Myth Builder</h1>
+          <p>Forge a new legend. Each click combines a hero, a power, a monster, a setting, and a prophecy into a unique myth.</p>
+        </header>
+
+        <div class="game-area">
+          <div class="myth-output" id="myth-output" aria-live="polite"></div>
+          <div class="text-center">
+            <button class="btn btn-primary" id="forge-btn" type="button">Forge New Myth</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/script.js" defer></script>
+  <script src="../assets/games.js" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      var heroes = [
+        "a young shepherd with the blood of a forgotten god",
+        "a blind oracle who sees through the eyes of ravens",
+        "a exiled prince carrying a cursed blade",
+        "a blacksmith's daughter who can speak to fire",
+        "a wandering bard whose songs reshape reality",
+        "a thief raised in the temples of the old gods",
+        "a warrior marked by lightning since birth",
+        "a scholar who discovered a language that predates the gods"
+      ];
+
+      var powers = [
+        "the ability to command storms",
+        "the power to walk between worlds",
+        "the gift of turning stone into living creatures",
+        "the curse of seeing every possible future",
+        "the strength to move mountains with a whisper",
+        "the talent to forge weapons from pure shadow",
+        "the skill to heal any wound with a song",
+        "the power to stop time for a single heartbeat"
+      ];
+
+      var monsters = [
+        "a serpent made of living darkness that swallows light",
+        "a titan of iron and bone who guards the gate to the underworld",
+        "a shapeshifter who wears the faces of fallen kings",
+        "a swarm of spectral wolves that hunt only during eclipses",
+        "a colossus of coral and seawater risen from the deep",
+        "a dragon whose scales mirror the night sky",
+        "a spider goddess who weaves fate itself",
+        "a stone giant awakened by an ancient betrayal"
+      ];
+
+      var settings = [
+        "at the edge of a sea that burns with blue flame",
+        "beneath a mountain where the gods once held council",
+        "in a city built on the back of a sleeping titan",
+        "on a floating island above an endless storm",
+        "within a forest where the trees remember everything",
+        "at the crossroads of three rivers that flow backward",
+        "inside a labyrinth carved from a single crystal",
+        "upon a battlefield frozen in time for a thousand years"
+      ];
+
+      var prophecies = [
+        "It is written that when the last star falls, the old world will end and the new one will be forged in its place.",
+        "The prophecy states that only the one who carries both light and shadow within them can close the rift between realms.",
+        "Ancient texts foretell that the monster cannot be slain by strength alone \u2014 only by sacrifice freely given.",
+        "The seers predicted that the hero would face three trials: one of courage, one of wisdom, and one of mercy.",
+        "Legend says the weapon needed to defeat the beast lies shattered across the four corners of the known world.",
+        "The oracle declared that the hero must choose between saving the world and saving the one they love most.",
+        "An old inscription warns: the power that defeats the darkness will also demand a price no mortal willingly pays.",
+        "The final verse of the prophecy has been lost \u2014 torn from the book by someone who feared what it foretold."
+      ];
+
+      var output = document.getElementById("myth-output");
+      var forgeBtn = document.getElementById("forge-btn");
+
+      function forgeMyth() {
+        output.classList.add("fading");
+
+        setTimeout(function () {
+          var hero = GameUtils.pickRandom(heroes);
+          var power = GameUtils.pickRandom(powers);
+          var monster = GameUtils.pickRandom(monsters);
+          var setting = GameUtils.pickRandom(settings);
+          var prophecy = GameUtils.pickRandom(prophecies);
+
+          var myth = "Long ago, " + setting + ", there lived " + hero + ". ";
+          myth += "They were gifted with " + power + ", a force both wondrous and terrible. ";
+          myth += "But fate had set a challenge before them: " + monster + " had risen, threatening to consume all that remained of the old world. ";
+          myth += prophecy + " ";
+          myth += "And so the journey began \u2014 not with a battle cry, but with a single step into the unknown.";
+
+          output.textContent = myth;
+          output.classList.remove("fading");
+        }, 400);
+      }
+
+      forgeBtn.addEventListener("click", forgeMyth);
+      forgeMyth();
+    });
+  </script>
+</body>
+</html>

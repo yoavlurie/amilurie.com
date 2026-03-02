@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ami Lurie — World Builder. Game Designer. Myth Maker.</title>
+  <meta name="description" content="Ami Lurie builds interactive worlds inspired by mythology, strategy games, and epic adventures.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="index.html" aria-current="page">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="games.html">Games</a></li>
+        <li><a href="myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>Ami Lurie</h1>
+        <p class="hero-subtitle">World Builder. Game Designer. <span class="lightning-trigger" role="img" aria-label="Lightning bolt">&#9889;</span> Myth Maker.</p>
+        <p class="hero-description">He builds interactive worlds inspired by mythology, strategy games, and epic adventures.</p>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="featured-heading">
+      <div class="container">
+        <h2 class="section-title" id="featured-heading">Featured Creations</h2>
+        <div class="card-grid">
+
+          <a href="myth-o-magic.html" class="card" aria-label="Explore Myth-o-Magic">
+            <div class="card-icon" aria-hidden="true">&#127183;</div>
+            <h3>Myth-o-Magic</h3>
+            <p>An original strategy card game built around elemental powers, mythical creatures, and strategic combinations.</p>
+            <span class="card-link">Explore</span>
+          </a>
+
+          <a href="adventure.html" class="card" aria-label="Play The Long Adventure">
+            <div class="card-icon" aria-hidden="true">&#128214;</div>
+            <h3>The Long Adventure</h3>
+            <p>A mythology-inspired interactive adventure game with branching paths and hidden choices.</p>
+            <span class="card-link">Play</span>
+          </a>
+
+          <a href="games.html" class="card" aria-label="Browse Interactive Mini Games">
+            <div class="card-icon" aria-hidden="true">&#127918;</div>
+            <h3>Interactive Games</h3>
+            <p>A collection of browser-based mini games — word duels, myth forges, logic puzzles, and more.</p>
+            <span class="card-link">Browse</span>
+          </a>
+
+        </div>
+      </div>
+    </section>
+
+    <div class="section-tagline">"Every world starts with one idea."</div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="assets/script.js" defer></script>
+</body>
+</html>
