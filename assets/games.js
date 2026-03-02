@@ -1,5 +1,5 @@
 /* ============================================
-   AmiLurie.com — Shared Game Utilities
+   AmiLurie.com — Shared Game Utilities v2
    ============================================ */
 
 var GameUtils = (function () {
@@ -28,10 +28,15 @@ var GameUtils = (function () {
     return Math.random().toString(36).substring(2, 9);
   }
 
+  function clamp(val, min, max) {
+    return Math.max(min, Math.min(max, val));
+  }
+
   return {
     randomInt: randomInt,
     pickRandom: pickRandom,
     shuffleArray: shuffleArray,
-    generateId: generateId
+    generateId: generateId,
+    clamp: clamp
   };
 })();

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Myth Explorer — Ami Lurie</title>
+  <meta name="description" content="Myth Explorer: explore real gods, heroes, and monsters from Greek, Norse, and Egyptian mythology.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../games.html">Games</a></li>
+        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="../adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>Myth Explorer</h1>
+          <p>Explore real gods, heroes, and monsters from Greek, Norse, and Egyptian mythology. Select a pantheon, choose a figure type, then pick a character to learn their story.</p>
+        </header>
+
+        <div class="game-area" style="max-width:750px;">
+          <div class="explorer-controls">
+            <select class="explorer-select" id="mythology-select" aria-label="Select mythology">
+              <option value="">Choose Mythology</option>
+              <option value="greek">Greek</option>
+              <option value="norse">Norse</option>
+              <option value="egyptian">Egyptian</option>
+            </select>
+            <select class="explorer-select" id="type-select" aria-label="Select figure type" disabled>
+              <option value="">Choose Type</option>
+              <option value="god">God</option>
+              <option value="hero">Hero</option>
+              <option value="monster">Monster</option>
+            </select>
+          </div>
+
+          <div class="explorer-figure-list" id="figure-list" aria-label="Available figures"></div>
+
+          <div id="figure-card" class="hidden" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/script.js" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      var mythSelect = document.getElementById("mythology-select");
+      var typeSelect = document.getElementById("type-select");
+      var figureList = document.getElementById("figure-list");
+      var figureCard = document.getElementById("figure-card");
+
+      var data = {
+        greek: {
+          god: {
+            Zeus: {
+              domain: "King of the Gods \u2014 God of the Sky, Lightning, and Thunder",
+              summary: "Zeus ruled Mount Olympus as the supreme deity of the Greek pantheon. He overthrew his father Kronos and the Titans alongside his brothers Poseidon and Hades, then divided the cosmos among them. Zeus claimed the sky. He wielded the thunderbolt, forged by the Cyclopes, and his word was law among gods and mortals alike. Despite his authority, Zeus was known for his many conflicts with other Olympians and his complicated relationships with mortals.",
+              powers: "Command over lightning and storms, shapeshifting, supreme authority over all Olympian gods, control of weather and the skies",
+              famousMyth: "The Titanomachy \u2014 Zeus led the Olympian gods in a ten-year war against the Titans. With the help of the Cyclopes (who forged his thunderbolt) and the Hundred-Handed Ones, Zeus defeated Kronos and imprisoned the Titans in Tartarus, establishing the reign of the Olympians.",
+              symbol: "Thunderbolt, Eagle, Oak Tree"
+            },
+            Athena: {
+              domain: "Goddess of Wisdom, Strategy, and Warfare",
+              summary: "Athena was born fully formed from the head of Zeus, emerging in full armor. She was the goddess of wisdom, strategic warfare, and craftsmanship \u2014 as opposed to Ares, who represented the brutal side of war. Athena was the patron goddess of Athens, and the Parthenon was built in her honor. She was known for her calm judgment, fierce intelligence, and willingness to champion mortal heroes who demonstrated courage and cleverness.",
+              powers: "Supreme strategic intelligence, mastery of warfare and combat tactics, skill in all crafts and arts, ability to bestow wisdom or curses",
+              famousMyth: "The Contest for Athens \u2014 Athena competed against Poseidon for patronage of the city. Poseidon struck the ground and produced a saltwater spring. Athena planted an olive tree. The citizens chose Athena's gift for its practical value, and the city was named Athens in her honor.",
+              symbol: "Owl, Olive Tree, Aegis Shield"
+            },
+            Hades: {
+              domain: "God of the Underworld and the Dead",
+              summary: "Hades ruled the underworld after the defeat of the Titans, when the three brothers divided the cosmos. Though often portrayed as villainous in modern stories, Hades was considered stern and just rather than evil by the ancient Greeks. He maintained the balance between life and death, ensuring that the dead remained in his realm. He rarely left the underworld and was the least involved of the three brothers in the affairs of Olympus.",
+              powers: "Dominion over the dead, the Helm of Darkness (which granted invisibility), control of the riches beneath the earth (precious metals and gems), command over the creatures of the underworld",
+              famousMyth: "The Abduction of Persephone \u2014 Hades took Persephone, daughter of Demeter, to the underworld to be his queen. Demeter's grief caused the earth to become barren. Zeus intervened, and a compromise was reached: Persephone would spend part of each year in the underworld and part on the surface, creating the cycle of seasons.",
+              symbol: "Cerberus (three-headed dog), Cypress Tree, Helm of Darkness"
+            }
+          },
+          hero: {
+            Perseus: {
+              domain: "Slayer of Medusa \u2014 Legendary Greek Hero",
+              summary: "Perseus was the son of Zeus and the mortal Danae. King Polydectes sent him on what was meant to be an impossible quest: to bring back the head of Medusa, the Gorgon whose gaze turned anyone to stone. With gifts from the gods \u2014 winged sandals from Hermes, a cap of invisibility from Hades, and a polished shield from Athena \u2014 Perseus succeeded. He later used Medusa's head to rescue the princess Andromeda from a sea monster, and eventually founded the city of Mycenae.",
+              powers: "Divine heritage (son of Zeus), wielded Medusa's severed head as a weapon, possessed the winged sandals of Hermes and the cap of invisibility",
+              famousMyth: "The Slaying of Medusa \u2014 Perseus approached Medusa's lair using Athena's polished shield as a mirror to avoid her deadly gaze. He struck while looking only at her reflection, beheading her with a divine sickle. From her blood sprang Pegasus, the winged horse.",
+              symbol: "Medusa's Head, Winged Sandals, Polished Shield"
+            }
+          },
+          monster: {
+            Medusa: {
+              domain: "The Gorgon \u2014 Monster of Stone",
+              summary: "Medusa was one of three Gorgon sisters, but unlike her immortal siblings Stheno and Euryale, Medusa was mortal. According to later versions of the myth, she was originally a beautiful priestess of Athena who was transformed into a monster after Poseidon violated her in Athena's temple. Athena, enraged at the desecration, cursed Medusa with a monstrous form: snakes for hair and a gaze that turned living creatures to stone. She was eventually slain by the hero Perseus.",
+              powers: "Petrifying gaze that turned any living creature to stone, venomous serpent hair, her blood had magical properties (one vein could heal, another was deadly poison)",
+              famousMyth: "Her death at the hands of Perseus became one of the most famous myths in Greek mythology. Perseus used Athena's reflective shield to approach her without meeting her gaze, then severed her head. Even in death, Medusa's head retained its petrifying power and was used as a weapon.",
+              symbol: "Serpent Hair, Stone Gaze, Gorgon Mask"
+            }
+          }
+        },
+        norse: {
+          god: {
+            Thor: {
+              domain: "God of Thunder, Strength, and Protection",
+              summary: "Thor was the son of Odin and the earth goddess Jord. He was the strongest of all the Norse gods and the protector of both Asgard and Midgard (the human world). Thor was known for his enormous appetite, his fiery temper, and his unwavering loyalty to those he protected. He rode a chariot pulled by two goats, Tanngrisnir and Tanngnjostr, and was the most popular god among the common people of Scandinavia, who saw him as their champion against the forces of chaos.",
+              powers: "Wielded Mjolnir, the enchanted hammer that could level mountains and always returned to his hand. Wore the belt Megingjord which doubled his already immense strength. Iron gloves allowed him to grip Mjolnir. Could summon storms and lightning.",
+              famousMyth: "Thor's Fishing Trip \u2014 Thor went fishing with the giant Hymir, using an ox head as bait. He hooked Jormungandr, the World Serpent, and nearly pulled it from the ocean. Hymir, terrified, cut the line before Thor could slay the beast. This encounter foreshadowed their fated battle at Ragnarok.",
+              symbol: "Mjolnir (Hammer), Lightning, Goats"
+            },
+            Odin: {
+              domain: "Allfather \u2014 God of Wisdom, War, Death, and Poetry",
+              summary: "Odin was the chief of the Norse gods and ruler of Asgard. He was a complex deity: a seeker of knowledge, a god of war, a patron of poets, and a guide of the dead. Odin sacrificed his eye at the Well of Mimir to gain cosmic wisdom, and he hung himself from Yggdrasil, the World Tree, for nine days to discover the runes. He kept two ravens, Huginn (Thought) and Muninn (Memory), who flew across the world each day and reported back what they saw.",
+              powers: "Vast wisdom and foresight, mastery of runic magic, shapeshifting, the spear Gungnir which never missed its target, command of the Valkyries and the einherjar (heroic dead)",
+              famousMyth: "The Discovery of the Runes \u2014 Odin hung himself from Yggdrasil, pierced by his own spear, for nine nights without food or water. In his suffering, the runes revealed themselves to him \u2014 a system of symbols that held the power to heal, curse, protect, and transform. This act of self-sacrifice made him the master of runic magic.",
+              symbol: "Ravens, Spear (Gungnir), Single Eye, Runes"
+            },
+            Loki: {
+              domain: "Trickster God \u2014 God of Mischief and Shapeshifting",
+              summary: "Loki was not one of the Aesir by birth but a giant who became Odin's blood brother. He was the cleverest of all beings in Norse mythology, capable of extraordinary cunning and deception. Loki's relationship with the other gods was complicated: he helped them as often as he harmed them. His tricks ranged from harmless pranks to catastrophic betrayals. Over time, his actions grew darker, culminating in his role in the death of Baldur and his imprisonment until Ragnarok.",
+              powers: "Shapeshifting into any form (male, female, animal, object), supreme cunning and manipulation, silver tongue capable of deceiving even the gods",
+              famousMyth: "The Death of Baldur \u2014 When Baldur, the most beloved god, was made invulnerable to all things, Loki discovered the one exception: mistletoe. He crafted a dart from it and tricked the blind god Hodr into throwing it at Baldur, killing him. This act was considered Loki's greatest betrayal and led to his imprisonment beneath a venomous serpent until Ragnarok.",
+              symbol: "Fire, Serpent, Mistletoe"
+            }
+          },
+          hero: {},
+          monster: {
+            Fenrir: {
+              domain: "The Great Wolf \u2014 Devourer of Odin",
+              summary: "Fenrir was a monstrous wolf, the offspring of Loki and the giantess Angrboda. The gods raised him in Asgard, but as he grew larger and more powerful, they became afraid. Prophecy foretold that Fenrir would devour Odin at Ragnarok, the end of the world. The gods tried to bind him with chains, but he broke every one until the dwarves forged Gleipnir \u2014 a magical ribbon made from impossible things: the sound of a cat's footsteps, the roots of a mountain, the breath of a fish. Fenrir was bound, but the god Tyr lost his hand in the process.",
+              powers: "Immeasurable strength that grew without limit, jaws capable of swallowing the sky, destined to break free at Ragnarok and devour Odin himself",
+              famousMyth: "The Binding of Fenrir \u2014 The gods challenged Fenrir to break free from Gleipnir, the magical ribbon. Fenrir suspected a trap and demanded that one of the gods place a hand in his mouth as a sign of good faith. Only Tyr was brave enough. When Fenrir found he could not break free, he bit off Tyr's hand. Fenrir remains bound until Ragnarok, when he will break free and fulfill the prophecy.",
+              symbol: "Broken Chain, Open Jaws, Gleipnir"
+            }
+          }
+        },
+        egyptian: {
+          god: {
+            Ra: {
+              domain: "Sun God \u2014 King of the Egyptian Gods",
+              summary: "Ra was the supreme deity of the Egyptian pantheon and the personification of the sun. Each day, he sailed across the sky in his solar barque, bringing light and life to the world. Each night, he traveled through the Duat (the underworld), battling the chaos serpent Apophis to ensure the sun would rise again. Ra was believed to have created himself out of the primordial waters of Nun, and from him all other things emerged. He was the source of all life, warmth, and growth.",
+              powers: "Control of the sun and its life-giving energy, the divine Eye of Ra (a destructive force that could be sent against enemies), supreme authority over all other Egyptian gods, self-creation and self-renewal each dawn",
+              famousMyth: "The Nightly Battle with Apophis \u2014 Each night, as Ra sailed through the underworld, the chaos serpent Apophis attacked his barque, attempting to swallow the sun and plunge the world into eternal darkness. Ra, aided by other gods including Set, fought Apophis every night and defeated him every dawn \u2014 an eternal cycle that explained why the sun rose each morning.",
+              symbol: "Sun Disk, Falcon, Scarab Beetle"
+            },
+            Anubis: {
+              domain: "God of Mummification, the Dead, and the Afterlife",
+              summary: "Anubis was the jackal-headed god who presided over the process of mummification and guided the souls of the dead to the afterlife. He was considered the inventor of embalming, having performed the first mummification on the body of Osiris after his murder by Set. In the Hall of Ma'at, Anubis oversaw the Weighing of the Heart ceremony, where a deceased person's heart was weighed against the feather of truth to determine their worthiness for the afterlife.",
+              powers: "Mastery of mummification and preservation, guidance of souls through the underworld, the ability to weigh hearts against the feather of Ma'at, protection of tombs and the dead",
+              famousMyth: "The Weighing of the Heart \u2014 When a soul arrived in the afterlife, Anubis placed their heart on a golden scale opposite the feather of Ma'at (truth and justice). If the heart was lighter than the feather, the soul was deemed worthy and passed into the Field of Reeds. If heavier, the soul was devoured by Ammit, a demon with the head of a crocodile, the body of a lion, and the hindquarters of a hippopotamus.",
+              symbol: "Jackal, Scales of Justice, Ankh"
+            },
+            Isis: {
+              domain: "Goddess of Magic, Healing, and Motherhood",
+              summary: "Isis was one of the most important deities in all of Egyptian mythology. She was the wife of Osiris and mother of Horus, and her story is central to the greatest myth cycle in Egyptian religion. After her husband Osiris was murdered and dismembered by Set, Isis traveled across Egypt to find every piece of his body, reassembled him, and used her magic to conceive their son Horus. She then protected and raised Horus in secret until he was strong enough to challenge Set for the throne.",
+              powers: "Supreme magical ability (considered the greatest magician among all the gods), healing powers, ability to resurrect the dead, knowledge of every secret name (which gave her power over all things), protection magic",
+              famousMyth: "The Resurrection of Osiris \u2014 After Set murdered Osiris and scattered his body across Egypt, Isis searched tirelessly for every piece. With the help of her sister Nephthys and the god Thoth, she reassembled Osiris and used her magic to bring him back long enough to conceive Horus. Osiris then became ruler of the underworld, while Isis raised their son to one day reclaim the throne.",
+              symbol: "Throne Headdress, Wings, Knot of Isis"
+            }
+          },
+          hero: {},
+          monster: {
+            Set: {
+              domain: "God of Chaos, Storms, and the Desert",
+              summary: "Set occupied a complex role in Egyptian mythology. He was both a necessary force and a dangerous one. As the god of chaos, storms, deserts, and foreign lands, Set represented everything that threatened the ordered world of Ma'at. He murdered his brother Osiris out of jealousy and fought a long war against his nephew Horus for the throne of Egypt. Yet Set also served a vital purpose: each night, he stood on the prow of Ra's solar barque and fought the chaos serpent Apophis, protecting the sun god during his journey through the underworld.",
+              powers: "Immense physical strength, command over storms and the desert, mastery of chaos and disruption, the ability to take monstrous forms, protection against the forces of primordial chaos",
+              famousMyth: "The Murder of Osiris \u2014 Set tricked Osiris into lying inside a beautifully crafted chest, then sealed it shut and threw it into the Nile. When Isis recovered the body, Set found it and tore Osiris into fourteen pieces, scattering them across Egypt. This act set in motion the entire cycle of resurrection, vengeance, and the struggle for the throne that defined Egyptian mythology.",
+              symbol: "Set Animal (a creature resembling no known animal), Was Scepter, Desert"
+            }
+          }
+        }
+      };
+
+      var currentMyth = "";
+      var currentType = "";
+
+      function updateTypeSelect() {
+        currentMyth = mythSelect.value;
+        currentType = "";
+        typeSelect.value = "";
+        figureList.innerHTML = "";
+        figureCard.innerHTML = "";
+        figureCard.classList.add("hidden");
+
+        if (currentMyth) {
+          typeSelect.disabled = false;
+        } else {
+          typeSelect.disabled = true;
+        }
+      }
+
+      function updateFigureList() {
+        currentType = typeSelect.value;
+        figureList.innerHTML = "";
+        figureCard.innerHTML = "";
+        figureCard.classList.add("hidden");
+
+        if (!currentMyth || !currentType) return;
+
+        var figures = data[currentMyth][currentType];
+        if (!figures) return;
+
+        var names = Object.keys(figures);
+        if (names.length === 0) {
+          figureList.innerHTML = '<p style="color:var(--color-text-muted);font-size:0.95rem;">No ' + currentType + 's catalogued for this mythology yet.</p>';
+          return;
+        }
+
+        names.forEach(function (name) {
+          var btn = document.createElement("button");
+          btn.className = "figure-btn";
+          btn.textContent = name;
+          btn.type = "button";
+          btn.addEventListener("click", function () {
+            // Update active state
+            figureList.querySelectorAll(".figure-btn").forEach(function (b) {
+              b.classList.remove("active");
+            });
+            btn.classList.add("active");
+            showFigure(name, figures[name]);
+          });
+          figureList.appendChild(btn);
+        });
+      }
+
+      function showFigure(name, fig) {
+        figureCard.classList.add("fading");
+
+        setTimeout(function () {
+          figureCard.className = "explorer-card fade-in";
+
+          var html = "";
+          html += '<h2>' + escapeHtml(name) + '</h2>';
+          html += '<div class="figure-domain">' + escapeHtml(fig.domain) + '</div>';
+
+          html += '<div class="figure-section"><h3>Story</h3>';
+          html += '<p>' + escapeHtml(fig.summary) + '</p></div>';
+
+          html += '<div class="figure-section"><h3>Powers</h3>';
+          html += '<p>' + escapeHtml(fig.powers) + '</p></div>';
+
+          html += '<div class="figure-section"><h3>Famous Myth</h3>';
+          html += '<p>' + escapeHtml(fig.famousMyth) + '</p></div>';
+
+          html += '<div class="figure-section"><h3>Symbols</h3>';
+          html += '<p>' + escapeHtml(fig.symbol) + '</p></div>';
+
+          figureCard.innerHTML = html;
+        }, 300);
+      }
+
+      function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+      }
+
+      mythSelect.addEventListener("change", updateTypeSelect);
+      typeSelect.addEventListener("change", updateFigureList);
+    });
+  </script>
+</body>
+</html>

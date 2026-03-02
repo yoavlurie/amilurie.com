@@ -1,5 +1,5 @@
 /* ============================================
-   AmiLurie.com — Style System
+   AmiLurie.com — Style System v2
    ============================================ */
 
 :root {
@@ -14,6 +14,9 @@
   --color-border: #e2e0dc;
   --color-card-shadow: rgba(26, 26, 46, 0.08);
   --color-hero-gradient: linear-gradient(135deg, #f8f7f4 0%, #ede9ff 100%);
+  --color-success: #2d8a4e;
+  --color-danger: #d94040;
+  --color-warning: #d4a017;
 
   /* Typography */
   --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -109,6 +112,10 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+}
+
+select {
+  font-family: inherit;
 }
 
 /* ============================================
@@ -362,6 +369,20 @@ main {
   margin-left: 4px;
 }
 
+.card-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-accent-glow);
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+  width: fit-content;
+}
+
 /* ============================================
    Buttons
    ============================================ */
@@ -404,6 +425,12 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-md);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ============================================
@@ -464,75 +491,31 @@ main {
 }
 
 /* ============================================
-   Myth-o-Magic Card
+   Coming Soon Box (Myth-o-Magic)
    ============================================ */
 
-.myth-card {
+.coming-soon-box {
   background: var(--color-surface);
   border: 2px solid var(--color-accent);
   border-radius: var(--radius-lg);
-  padding: var(--space-xl);
-  max-width: 340px;
+  padding: var(--space-2xl);
+  max-width: 480px;
   margin: var(--space-xl) auto;
   text-align: center;
   box-shadow: 0 4px 20px var(--color-accent-glow);
-  transition: box-shadow var(--transition-slow);
 }
 
-.myth-card:hover {
-  box-shadow: 0 8px 32px var(--color-accent-glow);
-}
-
-.myth-card-element {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 0.3rem 0.8rem;
-  border-radius: 999px;
-  background: var(--color-accent-glow);
-  color: var(--color-accent);
-  margin-bottom: var(--space-md);
-}
-
-.myth-card h3 {
-  font-size: 1.4rem;
-  font-weight: 800;
-  margin-bottom: var(--space-md);
-}
-
-.myth-card-stats {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-xl);
-  margin-bottom: var(--space-md);
-}
-
-.myth-card-stat {
-  text-align: center;
-}
-
-.myth-card-stat .label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--color-text-muted);
-}
-
-.myth-card-stat .value {
-  font-size: 1.5rem;
+.coming-soon-box h2 {
+  font-size: 2rem;
   font-weight: 800;
   color: var(--color-accent);
+  margin-bottom: var(--space-md);
+  letter-spacing: -0.02em;
 }
 
-.myth-card-ability {
-  font-size: 0.9rem;
+.coming-soon-box p {
   color: var(--color-text-muted);
-  font-style: italic;
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-md);
+  font-size: 1rem;
 }
 
 /* ============================================
@@ -544,7 +527,7 @@ main {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-xl);
-  max-width: 650px;
+  max-width: 700px;
   margin: var(--space-xl) auto;
 }
 
@@ -561,60 +544,35 @@ main {
   gap: var(--space-md);
 }
 
-/* ============================================
-   Game-specific
-   ============================================ */
-
-.game-area {
-  max-width: 650px;
-  margin: var(--space-xl) auto;
-}
-
-/* Typing Duel */
-.typing-passage {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: var(--space-lg);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  line-height: 1.9;
+.adventure-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-xl);
   margin-bottom: var(--space-lg);
-  letter-spacing: 0.02em;
-}
-
-.typing-passage .correct {
-  color: #2d8a4e;
-}
-
-.typing-passage .incorrect {
-  color: #d94040;
-  text-decoration: underline;
-}
-
-.typing-passage .current {
-  background: var(--color-accent-glow);
-  border-radius: 2px;
-}
-
-.typing-input {
-  width: 100%;
   padding: var(--space-md);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  border: 2px solid var(--color-border);
+  background: var(--color-accent-glow);
   border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  transition: border-color var(--transition);
 }
 
-.typing-input:focus {
-  border-color: var(--color-accent);
-  outline: none;
+.adventure-stat {
+  text-align: center;
 }
 
-.timer-bar {
+.adventure-stat .stat-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.adventure-stat .stat-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--color-accent);
+}
+
+.adventure-progress {
   height: 4px;
   background: var(--color-border);
   border-radius: 2px;
@@ -622,65 +580,126 @@ main {
   overflow: hidden;
 }
 
-.timer-bar-fill {
+.adventure-progress-fill {
   height: 100%;
   background: var(--color-accent);
-  transition: width 1s linear;
   border-radius: 2px;
+  transition: width var(--transition-slow);
 }
 
-.results-panel {
-  background: var(--color-surface);
-  border: 2px solid var(--color-accent);
-  border-radius: var(--radius-lg);
-  padding: var(--space-xl);
-  text-align: center;
+/* ============================================
+   Game Area (shared)
+   ============================================ */
+
+.game-area {
+  max-width: 650px;
+  margin: var(--space-xl) auto;
 }
 
-.results-panel h2 {
-  font-size: 1.5rem;
-  margin-bottom: var(--space-lg);
-}
+/* ============================================
+   Myth Explorer
+   ============================================ */
 
-.results-stats {
+.explorer-controls {
   display: flex;
-  justify-content: center;
-  gap: var(--space-xl);
-  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
 }
 
-.results-stat .value {
-  font-size: 2rem;
-  font-weight: 800;
+.explorer-select {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color var(--transition);
+}
+
+.explorer-select:focus {
+  border-color: var(--color-accent);
+}
+
+.explorer-figure-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+}
+
+.figure-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: all var(--transition);
+}
+
+.figure-btn:hover {
+  border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
-.results-stat .label {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.figure-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
 }
 
-/* Myth Builder */
-.myth-output {
+.explorer-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-xl);
-  font-size: 1.05rem;
-  line-height: 1.8;
-  min-height: 120px;
-  margin-bottom: var(--space-lg);
   transition: opacity var(--transition-slow);
 }
 
-.myth-output.fading {
+.explorer-card.fading {
   opacity: 0;
 }
 
-/* LEGO Logic */
-.lego-board {
+.explorer-card h2 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: var(--space-xs);
+}
+
+.explorer-card .figure-domain {
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: var(--space-lg);
+}
+
+.explorer-card .figure-section {
+  margin-bottom: var(--space-lg);
+}
+
+.explorer-card .figure-section h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.explorer-card .figure-section p {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--color-text);
+}
+
+/* ============================================
+   Greek Logic (Temple of Athena)
+   ============================================ */
+
+.temple-board {
   display: flex;
   justify-content: center;
   gap: var(--space-md);
@@ -688,37 +707,37 @@ main {
   flex-wrap: wrap;
 }
 
-.lego-slot {
-  width: 70px;
-  height: 70px;
+.temple-slot {
+  width: 74px;
+  height: 74px;
   border: 2px dashed var(--color-border);
   border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.8rem;
+  font-size: 2rem;
   transition: all var(--transition);
 }
 
-.lego-slot.filled {
+.temple-slot.filled {
   border-style: solid;
 }
 
-.lego-slot.correct {
-  border-color: #2d8a4e;
-  box-shadow: 0 0 8px rgba(45, 138, 78, 0.3);
+.temple-slot.correct {
+  border-color: var(--color-success);
+  box-shadow: 0 0 10px rgba(45, 138, 78, 0.3);
 }
 
-.lego-slot.wrong-position {
-  border-color: #d4a017;
-  box-shadow: 0 0 8px rgba(212, 160, 23, 0.3);
+.temple-slot.wrong-position {
+  border-color: var(--color-warning);
+  box-shadow: 0 0 10px rgba(212, 160, 23, 0.3);
 }
 
-.lego-slot.incorrect {
-  border-color: #d94040;
+.temple-slot.incorrect {
+  border-color: var(--color-danger);
 }
 
-.lego-palette {
+.temple-palette {
   display: flex;
   justify-content: center;
   gap: var(--space-md);
@@ -726,11 +745,11 @@ main {
   flex-wrap: wrap;
 }
 
-.lego-block {
-  width: 56px;
-  height: 56px;
+.temple-symbol {
+  width: 62px;
+  height: 62px;
   border-radius: var(--radius);
-  font-size: 1.5rem;
+  font-size: 1.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -740,14 +759,10 @@ main {
   cursor: pointer;
 }
 
-.lego-block:hover {
+.temple-symbol:hover {
   transform: scale(1.1);
   box-shadow: 0 4px 12px var(--color-card-shadow);
-}
-
-.lego-block.selected {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-glow);
 }
 
 .feedback-text {
@@ -757,7 +772,176 @@ main {
   min-height: 1.5em;
 }
 
-/* Secret Game — Spell Sequence */
+.guess-history {
+  margin-top: var(--space-lg);
+}
+
+.guess-history h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.guess-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 1.3rem;
+}
+
+.guess-row .hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+/* ============================================
+   Duel Game
+   ============================================ */
+
+.duel-arena {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+@media (max-width: 500px) {
+  .duel-arena {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duel-fighter {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.duel-fighter h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: var(--space-md);
+}
+
+.duel-fighter .fighter-icon {
+  font-size: 2.5rem;
+  margin-bottom: var(--space-sm);
+}
+
+.health-bar-wrap {
+  background: var(--color-border);
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+  margin-bottom: var(--space-sm);
+}
+
+.health-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--transition-slow);
+}
+
+.health-bar.player-bar {
+  background: var(--color-success);
+}
+
+.health-bar.enemy-bar {
+  background: var(--color-danger);
+}
+
+.health-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.duel-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.duel-stats strong {
+  color: var(--color-text);
+}
+
+.duel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.battle-log {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.battle-log h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.battle-log p {
+  font-size: 0.9rem;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--color-border);
+  line-height: 1.5;
+}
+
+.battle-log p:last-child {
+  border-bottom: none;
+}
+
+.battle-log .log-player {
+  color: var(--color-success);
+}
+
+.battle-log .log-enemy {
+  color: var(--color-danger);
+}
+
+.duel-result {
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.duel-result h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: var(--space-md);
+}
+
+.duel-result.victory h2 {
+  color: var(--color-success);
+}
+
+.duel-result.defeat h2 {
+  color: var(--color-danger);
+}
+
+/* ============================================
+   Secret Game — Spell Sequence
+   ============================================ */
+
 .rune-grid {
   display: flex;
   justify-content: center;
@@ -792,7 +976,7 @@ main {
 }
 
 .rune.error {
-  border-color: #d94040;
+  border-color: var(--color-danger);
   box-shadow: 0 0 20px rgba(217, 64, 64, 0.3);
 }
 
@@ -819,7 +1003,7 @@ main {
 
 .backfire-screen h2 {
   font-size: 1.8rem;
-  color: #d94040;
+  color: var(--color-danger);
   margin-bottom: var(--space-md);
 }
 
@@ -830,7 +1014,7 @@ main {
 
 .win-screen h2 {
   font-size: 1.8rem;
-  color: #2d8a4e;
+  color: var(--color-success);
   margin-bottom: var(--space-md);
 }
 

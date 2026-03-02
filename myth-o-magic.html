@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Myth-o-Magic — Ami Lurie</title>
-  <meta name="description" content="Myth-o-Magic: an original strategy card game built around elemental powers, mythical creatures, and strategic combinations.">
+  <meta name="description" content="Myth-o-Magic: an original strategy card game currently being redesigned.">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -30,34 +30,15 @@
       <div class="container">
         <header class="page-header">
           <h1>Myth-o-Magic</h1>
-          <p>An original strategy card game built around elemental powers, mythical creatures, and strategic combinations.</p>
+          <p>An original strategy card game built around elemental powers, mythical creatures, and strategic combinations. Currently being redesigned from the ground up.</p>
         </header>
 
-        <p style="max-width:650px; margin-bottom:1.5rem; color:var(--color-text-muted);">Every card has a role. Every element has a counter. The game rewards creative thinking — finding the right combination at the right moment to turn the tide of battle. Below is a demo card generator that creates random cards from the Myth-o-Magic system.</p>
-
-        <div class="text-center mt-lg">
-          <h2 class="section-title">Card Generator</h2>
+        <div class="coming-soon-box">
+          <h2>Coming Soon</h2>
+          <p>A new myth-powered strategy system is in development. The next version of Myth-o-Magic will feature deeper mechanics, new elemental types, and a fully playable browser demo.</p>
         </div>
 
-        <div id="card-display" class="myth-card fade-in">
-          <div class="myth-card-element" id="card-element"></div>
-          <h3 id="card-name"></h3>
-          <div class="myth-card-stats">
-            <div class="myth-card-stat">
-              <span class="label">Attack</span>
-              <span class="value" id="card-attack"></span>
-            </div>
-            <div class="myth-card-stat">
-              <span class="label">Defense</span>
-              <span class="value" id="card-defense"></span>
-            </div>
-          </div>
-          <p class="myth-card-ability" id="card-ability"></p>
-        </div>
-
-        <div class="text-center mt-lg">
-          <button class="btn btn-primary" id="generate-card" type="button">Generate New Card</button>
-        </div>
+        <div class="section-tagline">"The cards are being reforged."</div>
       </div>
     </div>
   </main>
@@ -69,67 +50,5 @@
   </footer>
 
   <script src="assets/script.js" defer></script>
-  <script src="assets/games.js" defer></script>
-  <script defer>
-    document.addEventListener("DOMContentLoaded", function () {
-      "use strict";
-
-      var elements = ["Fire", "Water", "Earth", "Air", "Shadow", "Lightning", "Ice", "Nature"];
-
-      var prefixes = [
-        "Ancient", "Crimson", "Shadow", "Storm", "Golden", "Iron", "Crystal", "Phantom",
-        "Celestial", "Ember", "Frost", "Thunder", "Obsidian", "Radiant", "Void", "Silver"
-      ];
-
-      var creatures = [
-        "Griffin", "Hydra", "Phoenix", "Minotaur", "Serpent", "Wraith", "Golem", "Drake",
-        "Chimera", "Titan", "Cerberus", "Sphinx", "Cyclops", "Basilisk", "Kraken", "Harpy",
-        "Wyvern", "Leviathan", "Pegasus", "Manticore"
-      ];
-
-      var abilities = [
-        "Burns all adjacent enemies for 2 turns",
-        "Heals 3 HP when entering battle",
-        "Cannot be targeted by ranged attacks",
-        "Deals double damage against Water types",
-        "Absorbs the first hit each round",
-        "Poisons the enemy for 1 damage per turn",
-        "Swaps Attack and Defense on command",
-        "Summons a shield that blocks one ability",
-        "Steals 2 Attack from the opposing card",
-        "Reflects the next special ability used against it",
-        "Gains +1 Attack for each ally on the field",
-        "Freezes the opponent for one turn",
-        "Ignores enemy Defense on the first strike",
-        "Restores to full HP once per game",
-        "Copies the last ability used by any card",
-        "Deals 3 damage to all enemies when defeated"
-      ];
-
-      var cardDisplay = document.getElementById("card-display");
-      var cardName = document.getElementById("card-name");
-      var cardElement = document.getElementById("card-element");
-      var cardAttack = document.getElementById("card-attack");
-      var cardDefense = document.getElementById("card-defense");
-      var cardAbility = document.getElementById("card-ability");
-      var generateBtn = document.getElementById("generate-card");
-
-      function generateCard() {
-        cardDisplay.classList.remove("fade-in");
-        // Trigger reflow
-        void cardDisplay.offsetWidth;
-        cardDisplay.classList.add("fade-in");
-
-        cardName.textContent = GameUtils.pickRandom(prefixes) + " " + GameUtils.pickRandom(creatures);
-        cardElement.textContent = GameUtils.pickRandom(elements);
-        cardAttack.textContent = GameUtils.randomInt(1, 12);
-        cardDefense.textContent = GameUtils.randomInt(1, 12);
-        cardAbility.textContent = GameUtils.pickRandom(abilities);
-      }
-
-      generateBtn.addEventListener("click", generateCard);
-      generateCard();
-    });
-  </script>
 </body>
 </html>

@@ -4,8 +4,95 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Long Adventure — Ami Lurie</title>
-  <meta name="description" content="A long-form interactive mythology-inspired adventure game by Ami Lurie.">
+  <meta name="description" content="A branching interactive mythology adventure game by Ami Lurie. Encounter Athena, Loki, Anubis, and ancient monsters.">
   <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .adventure-panel {
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 2rem;
+      border-radius: 12px;
+      background: var(--surface, #1a1a2e);
+      border: 1px solid var(--border, #333);
+    }
+
+    .adventure-progress {
+      width: 100%;
+      height: 8px;
+      background: var(--border, #333);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+
+    .adventure-progress-fill {
+      height: 100%;
+      background: var(--accent, #e2b714);
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    .adventure-stats {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .adventure-stats .stat {
+      font-size: 0.9rem;
+      padding: 0.4rem 1rem;
+      border-radius: 20px;
+      background: var(--border, #333);
+      color: var(--text, #eee);
+      font-weight: 600;
+    }
+
+    .story-text {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      margin-bottom: 2rem;
+      white-space: pre-line;
+    }
+
+    .adventure-choices {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .adventure-choices .btn {
+      text-align: left;
+      padding: 0.85rem 1.25rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border: 1px solid var(--border, #444);
+      border-radius: 8px;
+      background: var(--surface, #1a1a2e);
+      color: var(--text, #eee);
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .adventure-choices .btn:hover {
+      background: var(--border, #333);
+      border-color: var(--accent, #e2b714);
+    }
+
+    .adventure-choices .btn-primary {
+      border-color: var(--accent, #e2b714);
+      background: rgba(226, 183, 20, 0.1);
+    }
+
+    .adventure-choices .btn-secondary {
+      opacity: 0.85;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
 </head>
 <body>
 
@@ -30,10 +117,14 @@
       <div class="container">
         <header class="page-header">
           <h1>The Long Adventure</h1>
-          <p>A mythology-inspired interactive adventure game currently in development. Below is a playable demo of the opening sequence.</p>
+          <p>A branching mythology quest. Every choice shapes your fate. Three gods. One crossroads. Your call.</p>
         </header>
 
         <div class="adventure-panel" id="adventure-panel">
+          <div class="adventure-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="adventure-progress-fill" id="progress-fill"></div>
+          </div>
+          <div class="adventure-stats" id="stats-display"></div>
           <div class="story-text" id="story-text" aria-live="polite"></div>
           <div class="adventure-choices" id="choices"></div>
         </div>
@@ -52,102 +143,468 @@
     document.addEventListener("DOMContentLoaded", function () {
       "use strict";
 
-      var storyText = document.getElementById("story-text");
-      var choicesEl = document.getElementById("choices");
+      /* ---------- footer year ---------- */
+      var yearSpan = document.getElementById("footer-year");
+      if (yearSpan) yearSpan.textContent = new Date().getFullYear();
 
+      /* ---------- DOM refs ---------- */
+      var storyEl   = document.getElementById("story-text");
+      var choicesEl = document.getElementById("choices");
+      var statsEl   = document.getElementById("stats-display");
+      var progressFill = document.getElementById("progress-fill");
+
+      /* ---------- state ---------- */
+      var stats = { wisdom: 1, strength: 1, trickery: 1 };
+      var maxDepth = 8;
+
+      /* ---------- story scenes ---------- */
       var scenes = {
+
+        /* ===== OPENING ===== */
         start: {
-          text: "You stand at the entrance of an ancient temple carved into the mountainside. Torchlight flickers from within, casting long shadows across stone walls covered in forgotten runes. The air smells of damp earth and something older \u2014 something powerful. A narrow path descends into darkness ahead. To your right, a crumbling staircase spirals upward into the mountain itself.",
+          text: "You stand at the Crossroads of Worlds, where the sky cracks like shattered marble and three paths spiral outward into myth. The air smells of smoke, salt, and something older than language.\n\nA voice \u2014 not quite human \u2014 reverberates from everywhere at once:\n\n\"Mortal. The boundaries between pantheons are failing. If the seal is not restored, every myth will unravel into nothing. You have been chosen \u2014 or perhaps you simply wandered in at the wrong time.\"\n\nThree figures emerge from the haze ahead.",
+          depth: 0,
           choices: [
-            { text: "Descend into the darkness", next: "descent" },
-            { text: "Climb the crumbling staircase", next: "climb" }
+            { text: "Approach the tall woman in gleaming armor \u2014 she radiates calm authority.", next: "meet_athena" },
+            { text: "Walk toward the figure with the sharp grin and shifting green eyes.", next: "meet_loki" },
+            { text: "Step toward the jackal-headed silhouette standing perfectly still.", next: "meet_anubis" }
           ]
         },
-        descent: {
-          text: "The passage narrows as you descend. Your footsteps echo against wet stone. The torches on the walls grow fewer until only a faint blue glow lights the way \u2014 bioluminescent moss clinging to the ceiling like scattered stars. You reach a fork. To the left, you hear the sound of rushing water. To the right, a faint humming, almost like a voice singing in a language you have never heard.",
+
+        /* ===== ATHENA BRANCH ===== */
+        meet_athena: {
+          text: "The woman fixes you with grey eyes that seem to hold libraries.\n\n\"I am Athena. I do not deal in flattery, so I will be direct: the Seal of Convergence is fracturing because a creature of the old world \u2014 the Gorgon Medusa \u2014 has wrapped herself around it. Brute force will not free it. Strategy will.\"\n\nShe extends an olive branch that glimmers with faint light.\n\n\"Take this. It will not make you invincible, but it will make you think more clearly \u2014 which is better.\"",
+          depth: 1,
           choices: [
-            { text: "Follow the sound of water", next: "water" },
-            { text: "Follow the humming voice", next: "voice" }
+            { text: "Accept the olive branch and ask Athena for her plan. (+1 Wisdom)", next: "athena_plan", stat: { wisdom: 1 } },
+            { text: "Thank her but ask if there\u2019s a faster, cleverer way. (+1 Trickery)", next: "athena_shortcut", stat: { trickery: 1 } },
+            { text: "Decline \u2014 you\u2019d rather find Loki or Anubis first.", next: "crossroads_return" }
           ]
         },
-        climb: {
-          text: "The staircase groans under your weight. Dust falls from above as you climb higher. At the top, you emerge into a vast open chamber. Moonlight pours through a crack in the ceiling, illuminating a stone pedestal at the center. On the pedestal sits a bronze compass, its needle spinning slowly. Behind the pedestal, a mosaic on the wall depicts a great battle between gods and titans. One section of the mosaic appears loose.",
+
+        athena_plan: {
+          text: "Athena nods, almost smiling.\n\n\"Medusa guards the eastern passage. She was not always a monster \u2014 remember that. A mirror will reflect her gaze, but it takes wisdom to know when to look and when to look away.\"\n\nShe hands you a polished bronze shield.\n\n\"The shield of Perseus \u2014 on loan. Do not lose it.\"\n\nYou feel sharper already. The world seems to have more edges, more detail.",
+          depth: 2,
           choices: [
-            { text: "Take the bronze compass", next: "compass" },
-            { text: "Investigate the loose mosaic tile", next: "mosaic" }
+            { text: "Head east toward Medusa\u2019s lair immediately. (+1 Strength)", next: "medusa_approach", stat: { strength: 1 } },
+            { text: "Ask Athena what she knows about the other gods at the crossroads. (+1 Wisdom)", next: "athena_intel", stat: { wisdom: 1 } }
           ]
         },
-        water: {
-          text: "You follow the sound until the passage opens into a cavern split by an underground river. The water is black and fast, carrying glimmers of reflected light from crystals embedded in the walls. A stone bridge stretches across, ancient but intact. On the far side, you see the outline of a doorway carved with symbols of protection. You feel a deep certainty: whatever lies beyond that door has been waiting for a long time.",
+
+        athena_intel: {
+          text: "\"Loki is here because chaos amuses him \u2014 but also because the convergence threatens Asgard. He may help you, but never trust his help to be free. Anubis guards the underworld gate. If the seal breaks fully, the dead will walk between worlds.\"\n\nShe pauses.\n\n\"If you are wise enough when the moment comes, you may be able to restore the seal without violence. But that path requires a mind unclouded by fear.\"\n\nHer eyes search yours. Whatever she finds there, she keeps to herself.",
+          depth: 3,
           choices: [
-            { text: "Cross the bridge", next: "ending_bridge" },
-            { text: "Search the near side of the river first", next: "ending_search" }
+            { text: "Head east to face Medusa with your new knowledge. (+1 Wisdom)", next: "medusa_approach", stat: { wisdom: 1 } },
+            { text: "Seek out Loki \u2014 maybe his tricks can complement your strategy.", next: "meet_loki" }
           ]
         },
-        voice: {
-          text: "The humming grows louder as you approach. The tunnel widens into a small shrine. In the center, a figure made entirely of woven silver threads floats above the ground, eyes closed, mouth moving with the song. The melody tugs at something in your memory \u2014 a lullaby you heard as a child, though you cannot remember who sang it. The figure opens its eyes and looks directly at you.",
+
+        athena_shortcut: {
+          text: "Athena\u2019s expression sharpens.\n\n\"Cleverness without wisdom is just noise. But I respect initiative.\"\n\nShe tells you of a hidden passage behind Medusa\u2019s lair \u2014 a tunnel carved by Hermes centuries ago for exactly the kind of person who prefers not to fight.\n\n\"It will get you to the Seal, but you will have to deal with what guards the other side without my shield. Are you clever enough for that?\"",
+          depth: 2,
           choices: [
-            { text: "Speak to the figure", next: "ending_speak" },
-            { text: "Listen to the full song", next: "ending_listen" }
+            { text: "Take the hidden passage \u2014 you trust your wits. (+1 Trickery)", next: "hermes_tunnel", stat: { trickery: 1 } },
+            { text: "On second thought, take the shield and face Medusa properly. (+1 Wisdom)", next: "medusa_approach", stat: { wisdom: 1 } }
           ]
         },
-        compass: {
-          text: "The moment your fingers touch the compass, its needle stops spinning and points firmly toward the mosaic wall. The bronze grows warm in your hand. Somewhere deep below the mountain, something shifts \u2014 a low rumble, like a door opening after centuries. The compass is not just a tool. It is a key. And whatever it unlocks has just begun to wake.",
+
+        /* ===== LOKI BRANCH ===== */
+        meet_loki: {
+          text: "The figure solidifies into a lean man with red hair and a grin that suggests he knows something you don\u2019t \u2014 and he always will.\n\n\"Well, well. A mortal at the crossroads. This is more fun than I expected.\"\n\nHe flips a golden coin that seems to change shape mid-air.\n\n\"I\u2019m Loki. Yes, that Loki. Before you ask: I\u2019m not here to cause trouble. Trouble simply follows me like a loyal dog. The seal is breaking, and if it shatters, even I can\u2019t enjoy the chaos \u2014 because there won\u2019t be anyone left to appreciate it.\"\n\nHe leans close.\n\n\"I can teach you a trick worth more than any sword. Interested?\"",
+          depth: 1,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "\"Teach me the trick.\" (+1 Trickery)", next: "loki_trick", stat: { trickery: 1 } },
+            { text: "\"I don\u2019t trust you, but I\u2019ll listen.\" (+1 Wisdom)", next: "loki_cautious", stat: { wisdom: 1 } },
+            { text: "\"No thanks. I\u2019d rather talk to someone more reliable.\"", next: "crossroads_return" }
           ]
         },
-        mosaic: {
-          text: "You press the loose tile and it sinks into the wall with a click. The entire mosaic begins to shift \u2014 tiles rearranging themselves like a living puzzle. When they settle, the image has changed. It no longer shows a battle. It shows a map \u2014 the mountain from above, with paths you have never seen marked in glowing blue lines. One path leads deep underground. Another leads to a peak surrounded by storm clouds. A third points toward the sea. The adventure has just begun.",
+
+        loki_trick: {
+          text: "Loki grins wider.\n\n\"The Minotaur guards the northern passage to the Seal. Big, angry, not much for conversation. But here\u2019s the thing about labyrinths \u2014 the Minotaur doesn\u2019t actually know the way out. He\u2019s as trapped as anyone.\"\n\nHe presses the golden coin into your palm. It\u2019s warm.\n\n\"This coin shows you hidden paths. Walls that aren\u2019t really walls. Doors that pretend to be stone. The labyrinth will open for you like a book.\"\n\nHe winks.\n\n\"Of course, the Minotaur might still try to kill you. I said I\u2019d help. I didn\u2019t say it would be easy.\"",
+          depth: 2,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "Head north into the Labyrinth with Loki\u2019s coin. (+1 Trickery)", next: "labyrinth_enter", stat: { trickery: 1 } },
+            { text: "Ask Loki to come with you \u2014 he seems like useful backup. (+1 Strength)", next: "loki_companion", stat: { strength: 1 } }
           ]
         },
-        ending_bridge: {
-          text: "You cross the stone bridge. Each step feels deliberate, as though the bridge is testing your resolve. On the other side, the carved doorway pulses with a faint warmth. You push it open and step into a chamber filled with golden light. In its center floats an ancient scroll, unrolling itself slowly, revealing words in a language that somehow you can read. The first line says: \"You who have crossed the deep water \u2014 the trials ahead are yours to shape.\" This is only the beginning.",
+
+        loki_cautious: {
+          text: "\"Smart,\" Loki says, and for a moment the grin fades into something almost respectful.\n\n\"Fine. No tricks \u2014 just information. The Minotaur guards one path. Medusa guards another. The underworld gate is the third. Each leads to the Seal, but each tests something different.\"\n\nHe taps his temple.\n\n\"The Minotaur tests your cunning \u2014 can you navigate the maze? Medusa tests your nerve \u2014 can you face horror without flinching? The underworld tests your judgment \u2014 can you deal with the dead without losing yourself?\"\n\nHe flips the coin once more.\n\n\"Choose wisely. Or don\u2019t. It\u2019s your funeral. Possibly literally.\"",
+          depth: 2,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "Head north to the Labyrinth and the Minotaur. (+1 Trickery)", next: "labyrinth_enter", stat: { trickery: 1 } },
+            { text: "Head east to face Medusa. (+1 Strength)", next: "medusa_approach", stat: { strength: 1 } },
+            { text: "Head below to the Underworld gate and Anubis.", next: "meet_anubis" }
           ]
         },
-        ending_search: {
-          text: "You search along the riverbank and find a small alcove hidden behind a curtain of moss. Inside, scratched into the stone, is a message: \"The door opens for those who bring light, not force.\" Tucked into a crack in the wall is a small crystal that glows faintly when you hold it. You pocket it and stand, knowing it will matter later. Sometimes the wisest path is the patient one.",
+
+        loki_companion: {
+          text: "Loki laughs \u2014 a genuine, surprised sound.\n\n\"You want ME as a companion? Bold. Reckless. I like it.\"\n\nHe falls into step beside you. As you walk toward the northern passage, the air grows colder and the walls close in. Stone corridors replace open sky.\n\n\"Stay close,\" Loki murmurs, suddenly serious. \"The labyrinth shifts. But with two of us, we can cover more ground.\"\n\nAhead, you hear a deep, rumbling breath. Something enormous is pacing in the dark.",
+          depth: 3,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "Let Loki create a distraction while you find the path. (+1 Trickery)", next: "minotaur_distraction", stat: { trickery: 1 } },
+            { text: "Stand your ground and face whatever\u2019s breathing in the dark. (+1 Strength)", next: "minotaur_fight", stat: { strength: 1 } }
           ]
         },
-        ending_speak: {
-          text: "\"I have been waiting,\" the figure says, its voice layered with echoes. \"Not for anyone. For you.\" It extends a silver hand, and in its palm rests a single seed \u2014 dark as obsidian, warm as sunlight. \"Plant this where the rivers meet, and the old world will remember what it lost.\" The figure dissolves into threads of light, and the seed remains. Your quest has a purpose now.",
+
+        /* ===== ANUBIS BRANCH ===== */
+        meet_anubis: {
+          text: "The jackal-headed god regards you with eyes like black glass. When he speaks, his voice is calm and deep, like a river that has flowed since before the world had a name.\n\n\"I am Anubis. I weigh the hearts of the dead. Today, I weigh the living.\"\n\nHe holds up a golden scale. One side holds a feather; the other is empty.\n\n\"The underworld path leads to the Seal, but only the worthy may walk it. Tell me \u2014 what do you value above all else?\"",
+          depth: 1,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "\"Knowledge. Understanding the world is the only real power.\" (+1 Wisdom)", next: "anubis_wisdom", stat: { wisdom: 1 } },
+            { text: "\"Strength. Without the will to act, knowledge is useless.\" (+1 Strength)", next: "anubis_strength", stat: { strength: 1 } },
+            { text: "\"Adaptability. The clever survive where the strong and wise fall.\" (+1 Trickery)", next: "anubis_trickery", stat: { trickery: 1 } }
           ]
         },
-        ending_listen: {
-          text: "You sit and listen. The song washes over you like a tide, filling the chamber with warmth. Images flash through your mind \u2014 a great tree with roots that reach through the earth, a city built on clouds, a battle fought with words instead of weapons. When the song ends, the figure smiles and fades. But the knowledge remains. You understand things now that you did not before. The mountain is alive. And it has chosen you as its witness.",
+
+        anubis_wisdom: {
+          text: "Anubis places something invisible on the empty scale. It balances.\n\n\"Your heart speaks truth \u2014 for now. The underworld will test that.\"\n\nThe ground opens before you, revealing a staircase carved from obsidian that descends into warm, amber light. It smells like sand and myrrh.\n\n\"The dead remember what the living forget. Listen to them, and you will find the Seal. Ignore them, and you will join their number.\"\n\nHe steps aside.",
+          depth: 2,
           choices: [
-            { text: "Restart the adventure", next: "start" }
+            { text: "Descend into the Underworld. (+1 Wisdom)", next: "underworld_descent", stat: { wisdom: 1 } },
+            { text: "Ask Anubis what the dead will tell you. (+1 Wisdom)", next: "anubis_advice", stat: { wisdom: 1 } }
           ]
+        },
+
+        anubis_strength: {
+          text: "Anubis tilts his head.\n\n\"Strength. The pharaohs believed the same. Some became gods. Most became dust.\"\n\nThe scale tips, then steadies.\n\n\"You may pass \u2014 but the underworld does not reward force. Tread carefully.\"\n\nThe staircase opens, darker than before. The air rising from below is heavy and hot.",
+          depth: 2,
+          choices: [
+            { text: "Descend with confidence. (+1 Strength)", next: "underworld_descent", stat: { strength: 1 } },
+            { text: "Maybe the Labyrinth is more your speed \u2014 head north instead.", next: "labyrinth_enter" }
+          ]
+        },
+
+        anubis_trickery: {
+          text: "Something flickers behind Anubis\u2019s obsidian eyes \u2014 amusement, perhaps.\n\n\"The adaptable one. Loki would approve. I am... less certain.\"\n\nThe scale wobbles but holds.\n\n\"You may enter. But know this: the dead cannot be tricked. They have nothing left to lose.\"",
+          depth: 2,
+          choices: [
+            { text: "Descend into the Underworld anyway. (+1 Trickery)", next: "underworld_descent", stat: { trickery: 1 } },
+            { text: "Head east instead \u2014 Medusa sounds more manageable.", next: "medusa_approach" }
+          ]
+        },
+
+        anubis_advice: {
+          text: "\"They will tell you the truth you least want to hear. Every soul in the underworld carries one truth \u2014 the thing they understood only at the end.\"\n\nAnubis pauses.\n\n\"The Seal was forged by all the pantheons together, in the only moment they ever agreed. To restore it, you will need the same thing: unity. Not strength. Not cleverness. Understanding.\"\n\nHis words feel like a key turning in a lock you didn\u2019t know existed.",
+          depth: 3,
+          choices: [
+            { text: "Descend into the Underworld, carrying that knowledge. (+1 Wisdom)", next: "underworld_descent", stat: { wisdom: 1 } }
+          ]
+        },
+
+        /* ===== CROSSROADS RETURN ===== */
+        crossroads_return: {
+          text: "You step back to the center of the Crossroads. The three paths still spiral outward. The sky crackles overhead \u2014 the seal is weakening. You can feel it like pressure behind your eyes.\n\nTime is running short. The figures of the three gods remain at their posts, waiting.",
+          depth: 1,
+          choices: [
+            { text: "Approach Athena \u2014 the armored woman with grey eyes.", next: "meet_athena" },
+            { text: "Approach Loki \u2014 the sharp-grinned trickster.", next: "meet_loki" },
+            { text: "Approach Anubis \u2014 the jackal-headed guardian.", next: "meet_anubis" }
+          ]
+        },
+
+        /* ===== MEDUSA ENCOUNTER ===== */
+        medusa_approach: {
+          text: "The eastern path narrows into a canyon of grey stone. Statues line the walls \u2014 warriors, merchants, children \u2014 all frozen in expressions of terror. Their stone eyes stare at nothing.\n\nAt the end of the canyon, the passage opens into a chamber lit by sickly green light. You hear the hissing before you see her.\n\nMedusa sits coiled around a cracked pillar \u2014 the Seal of Convergence. Her snake-hair writhes. She doesn\u2019t look at you. Not yet.\n\n\"Another hero,\" she says, and her voice is tired. \"Do you even know why I\u2019m here? They put me here. The gods. To guard their precious seal because no one would dare approach me.\"\n\nShe turns her head slightly \u2014 not enough to catch your gaze.\n\n\"So. What will you do, hero?\"",
+          depth: 4,
+          choices: [
+            { text: "Use the bronze shield to reflect her gaze back at her. (+1 Strength)", next: "medusa_shield", stat: { strength: 1 } },
+            { text: "Talk to her. She sounds more weary than dangerous. (+1 Wisdom)", next: "medusa_talk", stat: { wisdom: 1 } },
+            { text: "Look for a way to sneak past her while she\u2019s distracted. (+1 Trickery)", next: "medusa_sneak", stat: { trickery: 1 } }
+          ]
+        },
+
+        medusa_shield: {
+          text: "You raise the polished bronze and angle it toward Medusa. She catches sight of her own reflection and hisses \u2014 a sound that\u2019s half rage, half pain.\n\nBut she doesn\u2019t turn to stone. Of course not. She\u2019s immune to her own gaze.\n\nShe does, however, flinch away from the light, releasing her grip on the Seal pillar for just a moment.\n\nThe crack in the Seal pulses. This is your chance.",
+          depth: 5,
+          choices: [
+            { text: "Rush to the Seal and try to repair it with sheer will. (+1 Strength)", next: "seal_approach_strength", stat: { strength: 1 } },
+            { text: "Speak the words of unity Anubis mentioned \u2014 if you know them. (+1 Wisdom)", next: "seal_check_wisdom", stat: { wisdom: 1 } }
+          ]
+        },
+
+        medusa_talk: {
+          text: "\"You\u2019re... talking to me?\" Medusa\u2019s voice cracks. The snakes slow their writhing.\n\n\"I was a priestess once. Did they tell you that? Before Poseidon. Before Athena\u2019s curse. I was a woman who served the gods faithfully, and they repaid me with this.\"\n\nShe gestures at herself without looking up.\n\n\"I don\u2019t want to guard this seal. I never did. But where else would I go? The world fears me. At least here, I have purpose.\"\n\nThe snakes droop. She looks almost human in her sadness.",
+          depth: 5,
+          choices: [
+            { text: "\"Help me restore the Seal. Then I\u2019ll help free you from this curse.\" (+1 Wisdom)", next: "medusa_ally", stat: { wisdom: 1 } },
+            { text: "While she\u2019s emotional, slip past to the Seal. (+1 Trickery)", next: "medusa_sneak_emotional", stat: { trickery: 1 } }
+          ]
+        },
+
+        medusa_sneak: {
+          text: "You press yourself against the canyon wall and edge around the chamber. Medusa is still talking, mostly to herself. Her attention drifts.\n\nYou make it halfway around the room before a snake on her head swivels toward you and hisses. Medusa\u2019s head begins to turn.\n\nYou have about two seconds.",
+          depth: 5,
+          choices: [
+            { text: "Dive behind the Seal pillar \u2014 use it as cover. (+1 Trickery)", next: "seal_approach_trick", stat: { trickery: 1 } },
+            { text: "Close your eyes and rush forward blind. (+1 Strength)", next: "seal_approach_strength", stat: { strength: 1 } }
+          ]
+        },
+
+        medusa_ally: {
+          text: "Medusa is silent for a long time. When she speaks, her voice is steady.\n\n\"No one has ever offered me that. Not once, in three thousand years.\"\n\nShe uncurls from the pillar, keeping her eyes averted. The Seal is exposed \u2014 cracked, pulsing with unstable energy.\n\n\"I\u2019ll hold the fragments together. You speak whatever words of binding you have. If this works... if you actually meant what you said...\"\n\nShe trails off. The snakes are still.",
+          depth: 6,
+          choices: [
+            { text: "Place your hands on the Seal and speak of unity between worlds.", next: "seal_check_wisdom" }
+          ]
+        },
+
+        medusa_sneak_emotional: {
+          text: "You feel a pang of guilt as you slip past her while she mourns \u2014 but the seal is cracking. Sentiment can\u2019t fix a collapsing multiverse.\n\nYou reach the pillar. The Seal thrums under your fingers, hot and unstable.",
+          depth: 6,
+          choices: [
+            { text: "Try to repair the Seal with whatever you have.", next: "seal_check_trickery" }
+          ]
+        },
+
+        /* ===== LABYRINTH / MINOTAUR ===== */
+        labyrinth_enter: {
+          text: "The northern path becomes a corridor of ancient stone. The walls are carved with spirals that seem to move when you\u2019re not looking directly at them.\n\nThe Labyrinth.\n\nThe air is thick and damp. Every few steps, the corridor branches \u2014 left, right, sometimes three or four ways at once. The golden coin in your pocket pulses faintly.\n\nDeep in the maze, something bellows. The sound shakes dust from the ceiling.",
+          depth: 3,
+          choices: [
+            { text: "Follow the coin\u2019s guidance through hidden passages. (+1 Trickery)", next: "labyrinth_navigate", stat: { trickery: 1 } },
+            { text: "Mark the walls and navigate methodically. (+1 Wisdom)", next: "labyrinth_navigate", stat: { wisdom: 1 } },
+            { text: "Walk toward the bellowing \u2014 face the Minotaur head on. (+1 Strength)", next: "minotaur_fight", stat: { strength: 1 } }
+          ]
+        },
+
+        labyrinth_navigate: {
+          text: "The labyrinth shifts around you, but you stay ahead of it. Hidden doors open. Dead ends reveal secret passages. You\u2019re close to the center now \u2014 you can feel the Seal\u2019s energy vibrating through the stone.\n\nThen the Minotaur finds you.\n\nHe\u2019s enormous \u2014 eight feet tall, bull-headed, with arms like tree trunks. But his eyes are not mindless. They\u2019re angry. Frustrated. Trapped.\n\n\"ANOTHER one,\" he rumbles. \"They send you through MY maze and expect me to just let you pass?\"",
+          depth: 4,
+          choices: [
+            { text: "\"I\u2019m not here to fight you. I\u2019m here to fix the Seal \u2014 which helps you too.\" (+1 Wisdom)", next: "minotaur_reason", stat: { wisdom: 1 } },
+            { text: "\"If I fix the Seal, maybe the labyrinth opens. You could be free.\" (+1 Trickery)", next: "minotaur_deal", stat: { trickery: 1 } },
+            { text: "Raise your fists. Some conversations only work one way. (+1 Strength)", next: "minotaur_fight", stat: { strength: 1 } }
+          ]
+        },
+
+        minotaur_reason: {
+          text: "The Minotaur snorts, blowing hot air that smells of hay and copper.\n\n\"Fix the Seal. That\u2019s what they all say. The last one who came through here said the same thing. Athena sent him. He didn\u2019t make it.\"\n\nBut he steps aside \u2014 barely. The passage behind him glows with the Seal\u2019s light.\n\n\"Go. Fix it. If the walls come down, I won\u2019t stop you. But if you fail, I\u2019m still here. And I\u2019ll be angrier.\"",
+          depth: 5,
+          choices: [
+            { text: "Pass through to the Seal chamber.", next: "seal_check_wisdom" }
+          ]
+        },
+
+        minotaur_deal: {
+          text: "The Minotaur\u2019s eyes widen.\n\n\"Free?\"\n\nThe word hangs in the damp air. He\u2019s never considered it. The labyrinth is all he\u2019s known.\n\n\"If you\u2019re lying, trickster, I will find you. Walls or no walls.\"\n\nBut he moves aside. The path to the Seal is open.\n\n\"Fix it. And then we\u2019ll see about these walls.\"",
+          depth: 5,
+          choices: [
+            { text: "Proceed to the Seal.", next: "seal_check_trickery" }
+          ]
+        },
+
+        minotaur_fight: {
+          text: "The Minotaur charges. You dodge \u2014 barely \u2014 and the wall behind you explodes into rubble. He\u2019s terrifyingly fast for his size.\n\nYou roll, sprint, and duck through a narrow gap he can\u2019t fit through. Behind you, he roars in frustration, punching the stone.\n\nYou\u2019re through. Bruised, breathing hard, but alive. The Seal chamber is ahead.",
+          depth: 5,
+          choices: [
+            { text: "Approach the Seal, heart pounding.", next: "seal_approach_strength" }
+          ]
+        },
+
+        minotaur_distraction: {
+          text: "Loki grins and snaps his fingers. A duplicate of himself appears at the far end of the corridor, waving and shouting insults in Old Norse.\n\nThe Minotaur bellows and charges the illusion. It shatters on impact, but by then you and the real Loki are through.\n\n\"See?\" Loki whispers, breathing fast. \"Tricks. They work.\"\n\nThe Seal chamber opens before you.",
+          depth: 4,
+          choices: [
+            { text: "Approach the Seal with Loki at your side.", next: "seal_check_trickery" }
+          ]
+        },
+
+        /* ===== UNDERWORLD ===== */
+        underworld_descent: {
+          text: "The obsidian staircase descends for what feels like hours. The amber light grows warmer, and eventually you emerge into a vast cavern lit by rivers of liquid gold \u2014 the underworld, or some version of it.\n\nShades drift past you \u2014 translucent figures who barely notice you\u2019re alive. One stops.\n\n\"You carry the weight of the living,\" the shade says. \"That\u2019s rare down here.\"\n\nShe was a warrior once \u2014 you can tell by the spectral armor she still wears.\n\n\"The Seal is at the heart of this place. But the path forks. One way is guarded by the shades of heroes who failed before you. The other is unguarded \u2014 but it changes you.\"",
+          depth: 3,
+          choices: [
+            { text: "Take the guarded path \u2014 face the hero shades. (+1 Strength)", next: "underworld_heroes", stat: { strength: 1 } },
+            { text: "Take the unguarded path \u2014 accept whatever change comes. (+1 Wisdom)", next: "underworld_change", stat: { wisdom: 1 } },
+            { text: "Ask the shade if there\u2019s a third way. (+1 Trickery)", next: "underworld_third_way", stat: { trickery: 1 } }
+          ]
+        },
+
+        underworld_heroes: {
+          text: "The hero shades stand in a line \u2014 spectral warriors from a dozen cultures. Greek hoplites, Norse berserkers, Egyptian champions.\n\nThey don\u2019t attack. Instead, they test you \u2014 each one asks a question, poses a riddle, or challenges your resolve. It\u2019s exhausting, but you push through.\n\nThe last shade \u2014 a tall woman with a broken spear \u2014 nods.\n\n\"You have the will. Go.\"",
+          depth: 4,
+          choices: [
+            { text: "Press onward to the Seal. (+1 Strength)", next: "seal_approach_strength", stat: { strength: 1 } }
+          ]
+        },
+
+        underworld_change: {
+          text: "The unguarded path hums with energy. As you walk, memories surface \u2014 not yours. You feel the weight of every myth, every story ever told. The Minotaur\u2019s loneliness. Medusa\u2019s grief. Loki\u2019s restlessness. Athena\u2019s burden of always being right.\n\nBy the time you reach the Seal chamber, you feel different. Heavier. Wiser. You understand now \u2014 the seal didn\u2019t break because of monsters or gods. It broke because the stories forgot how to listen to each other.",
+          depth: 4,
+          choices: [
+            { text: "Approach the Seal with your new understanding. (+1 Wisdom)", next: "seal_check_wisdom", stat: { wisdom: 1 } }
+          ]
+        },
+
+        underworld_third_way: {
+          text: "The shade tilts her head.\n\n\"Clever. There is a river \u2014 the forgotten one, not Styx or Lethe, but the one that flows between stories. It can carry you to the Seal directly, but you must give it something: a truth you\u2019ve never spoken aloud.\"\n\nThe river appears at your feet, dark and whispering.\n\n\"Speak your truth. Or don\u2019t. The dead don\u2019t judge.\"",
+          depth: 4,
+          choices: [
+            { text: "Speak a truth and ride the river to the Seal. (+1 Trickery)", next: "seal_check_trickery", stat: { trickery: 1 } },
+            { text: "Speak a truth and let the current carry you. (+1 Wisdom)", next: "seal_check_wisdom", stat: { wisdom: 1 } }
+          ]
+        },
+
+        /* ===== HERMES TUNNEL ===== */
+        hermes_tunnel: {
+          text: "The tunnel is narrow and smells of old magic. Symbols flash along the walls \u2014 Hermes\u2019s winged sandals, caduceus, messages in forgotten alphabets.\n\nYou emerge behind the Seal pillar. Medusa is on the other side, facing away. The Seal is right here \u2014 cracked, pulsing, barely holding.\n\nNo shield. No backup. Just you and your wits.",
+          depth: 3,
+          choices: [
+            { text: "Touch the Seal and try to mend it with sheer cleverness.", next: "seal_check_trickery" },
+            { text: "Wait and observe \u2014 figure out how the Seal works before touching it. (+1 Wisdom)", next: "seal_check_wisdom", stat: { wisdom: 1 } }
+          ]
+        },
+
+        /* ===== SEAL APPROACHES ===== */
+        seal_approach_strength: {
+          text: "You place your hands on the Seal. Energy roars through you \u2014 raw, ancient, overwhelming. Every myth in existence screams through your veins.\n\nThe cracks glow white-hot. The Seal is trying to reform, but it needs something more than strength to bind it.",
+          depth: 6,
+          choices: [
+            { text: "Pour everything you have into it \u2014 strength, will, determination.", next: "ending_check" }
+          ]
+        },
+
+        seal_approach_trick: {
+          text: "You tumble behind the Seal pillar just as Medusa\u2019s gaze sweeps the room. Stone spreads across the floor where you stood a moment ago.\n\nYour back is against the Seal. You can feel its cracks, its failing energy. The power hums through the stone into your bones.",
+          depth: 6,
+          choices: [
+            { text: "Try to repair the Seal from here, out of Medusa\u2019s sight.", next: "ending_check" }
+          ]
+        },
+
+        seal_check_wisdom: {
+          text: "You place your hands on the Seal. The cracks pulse with light.\n\nYou remember what Anubis said \u2014 or what the underworld showed you, or what Athena\u2019s calm certainty taught you: the Seal was forged by unity. All the myths, all the worlds, agreeing for one impossible moment.\n\nYou reach for that feeling. Not strength. Not cleverness. Understanding.",
+          depth: 7,
+          choices: [
+            { text: "Speak the words of binding and let understanding flow through you.", next: "ending_check" }
+          ]
+        },
+
+        seal_check_trickery: {
+          text: "You press your hands to the Seal and feel its structure \u2014 the way the magic interlocks like a puzzle. Every crack is a gap in the pattern.\n\nYou don\u2019t try to overpower it. You work the edges. Find the gaps. Slip energy into the cracks like picking a lock. It\u2019s delicate work, and one wrong move could shatter everything.\n\nBut you\u2019re good at this.",
+          depth: 7,
+          choices: [
+            { text: "Keep working. Steady hands. Steady mind.", next: "ending_check" }
+          ]
+        },
+
+        /* ===== ENDING CHECK (stat-based routing) ===== */
+        ending_check: {
+          text: "",
+          depth: 8,
+          choices: [],
+          conditional: true
+        },
+
+        /* ===== ENDINGS ===== */
+        ending_heroic: {
+          text: "The Seal blazes with golden light. The cracks close \u2014 not with force, but with harmony. Every myth, every world, every story finds its thread and weaves back into place.\n\nYou feel the convergence stabilize. The sky above the crossroads clears. Stars from a dozen mythologies shine together in a single sky \u2014 Greek constellations beside Norse runes beside Egyptian hieroglyphs, all coexisting.\n\nAthena appears beside you. For the first time, she smiles.\n\n\"You understood. That is rarer than you know.\"\n\nAnubis inclines his jackal head in silent approval. Even Loki, leaning against a pillar in the distance, gives you a slow, genuine nod.\n\nThe Seal holds. The worlds are safe \u2014 bound not by force or trickery, but by the wisdom to see that every story matters.\n\nYou are the one who remembered what the gods forgot.\n\n\u2014 THE HEROIC ENDING \u2014\n\nYour wisdom carried you through. You didn\u2019t just fix the Seal \u2014 you understood why it broke.",
+          depth: 8,
+          choices: [
+            { text: "Begin a new adventure.", next: "restart", btnClass: "btn-primary" }
+          ],
+          ending: true
+        },
+
+        ending_trickster: {
+          text: "The Seal snaps shut \u2014 not elegantly, not harmoniously, but effectively. The cracks seal with a shimmer of golden mischief. It\u2019s held together with cleverness, shortcuts, and a few tricks that would make the original builders wince.\n\nLoki appears, laughing.\n\n\"Oh, that\u2019s beautiful. It\u2019s ugly, it\u2019s unconventional, and it absolutely should not work. But it does. Just like you.\"\n\nAthena examines the Seal and purses her lips.\n\n\"This is... not how I would have done it.\"\n\n\"But it works,\" Loki says.\n\n\"...It works,\" she concedes.\n\nAnubis says nothing, but you think \u2014 you think \u2014 the jackal god is amused.\n\nThe worlds are safe. The method was questionable. The result was undeniable. And somewhere, in some version of every myth, a trickster is smiling.\n\n\u2014 THE TRICKSTER ENDING \u2014\n\nYou didn\u2019t play by the rules. The rules didn\u2019t seem to mind.",
+          depth: 8,
+          choices: [
+            { text: "Begin a new adventure.", next: "restart", btnClass: "btn-primary" }
+          ],
+          ending: true
+        },
+
+        ending_tragic: {
+          text: "The Seal resists you. The cracks widen. Energy pours out in blinding streams \u2014 the convergence is failing faster now, accelerated by your attempt to force it closed.\n\nYou feel the myths begin to unravel. Stories dissolve. Heroes forget their names. Monsters lose their shapes. The crossroads crumbles around you.\n\nAthena reaches for you, but her hand is already fading.\n\n\"You tried,\" she says. \"That counts for something. But trying is not the same as understanding.\"\n\nThe worlds come apart \u2014 not with a bang, but with a whisper. Every story ever told sighs once and goes quiet.\n\nIn the silence that follows, there is only the echo of what might have been.\n\n\u2014 THE TRAGIC ENDING \u2014\n\nThe Seal needed more than you could give. Perhaps, in another telling, you will find the wisdom, the strength, or the cunning to succeed.",
+          depth: 8,
+          choices: [
+            { text: "Try again from the beginning.", next: "restart", btnClass: "btn-primary" }
+          ],
+          ending: true
         }
       };
 
-      function renderScene(sceneKey) {
-        var scene = scenes[sceneKey];
+      /* ---------- rendering ---------- */
+      function renderStats() {
+        statsEl.innerHTML =
+          "<span class=\"stat\">Wisdom: " + stats.wisdom + "</span>" +
+          "<span class=\"stat\">Strength: " + stats.strength + "</span>" +
+          "<span class=\"stat\">Trickery: " + stats.trickery + "</span>";
+      }
+
+      function updateProgress(scene) {
+        var depth = (scene && scene.depth !== undefined) ? scene.depth : 0;
+        var pct = Math.min(Math.round((depth / maxDepth) * 100), 100);
+        progressFill.style.width = pct + "%";
+        var bar = progressFill.parentElement;
+        if (bar) bar.setAttribute("aria-valuenow", pct);
+      }
+
+      function renderScene(key) {
+        /* restart handler */
+        if (key === "restart") {
+          stats = { wisdom: 1, strength: 1, trickery: 1 };
+          renderScene("start");
+          return;
+        }
+
+        var scene = scenes[key];
         if (!scene) return;
 
-        storyText.textContent = scene.text;
+        /* conditional routing based on stats */
+        if (scene.conditional) {
+          if (stats.wisdom >= 3 && stats.wisdom >= stats.trickery) {
+            renderScene("ending_heroic");
+            return;
+          } else if (stats.trickery >= 3 && stats.trickery > stats.wisdom) {
+            renderScene("ending_trickster");
+            return;
+          } else {
+            renderScene("ending_tragic");
+            return;
+          }
+        }
 
+        /* update UI */
+        storyEl.textContent = scene.text;
+        updateProgress(scene);
+        renderStats();
+
+        /* hide stats on ending screens */
+        if (scene.ending) {
+          statsEl.classList.add("hidden");
+        } else {
+          statsEl.classList.remove("hidden");
+        }
+
+        /* render choices */
         choicesEl.innerHTML = "";
         scene.choices.forEach(function (choice) {
           var btn = document.createElement("button");
-          btn.className = "btn btn-secondary";
+          btn.className = "btn " + (choice.btnClass || "btn-secondary");
           btn.textContent = choice.text;
           btn.type = "button";
           btn.addEventListener("click", function () {
+            /* apply stat changes */
+            if (choice.stat) {
+              Object.keys(choice.stat).forEach(function (s) {
+                stats[s] = (stats[s] || 0) + choice.stat[s];
+              });
+            }
             renderScene(choice.next);
+            /* scroll adventure panel into view */
+            var panel = document.getElementById("adventure-panel");
+            if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
           });
           choicesEl.appendChild(btn);
         });
       }
 
+      /* ---------- start the game ---------- */
       renderScene("start");
     });
   </script>

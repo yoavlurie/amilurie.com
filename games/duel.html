@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mythic Duel — Ami Lurie</title>
+  <meta name="description" content="Mythic Duel: a turn-based battle against a mythic opponent. Attack, defend, or unleash a special strike.">
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../games.html">Games</a></li>
+        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
+        <li><a href="../adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container">
+        <header class="page-header">
+          <h1>Mythic Duel</h1>
+          <p>Face a mythic opponent in turn-based combat. Choose your moves wisely — attack, defend, or unleash a devastating special strike.</p>
+        </header>
+
+        <div class="game-area" style="max-width:700px;">
+
+          <div id="game-active">
+            <div class="duel-arena" id="arena">
+              <div class="duel-fighter" id="player-panel">
+                <div class="fighter-icon" aria-hidden="true">&#9876;</div>
+                <h3 id="player-name">Hero</h3>
+                <div class="health-bar-wrap">
+                  <div class="health-bar player-bar" id="player-hp-bar" style="width:100%"></div>
+                </div>
+                <div class="health-label"><span id="player-hp-text">100</span> / 100 HP</div>
+                <div class="duel-stats">
+                  <span>ATK: <strong id="player-atk">12</strong></span>
+                  <span>DEF: <strong id="player-def">8</strong></span>
+                </div>
+              </div>
+
+              <div class="duel-fighter" id="enemy-panel">
+                <div class="fighter-icon" aria-hidden="true" id="enemy-icon">&#128126;</div>
+                <h3 id="enemy-name">Opponent</h3>
+                <div class="health-bar-wrap">
+                  <div class="health-bar enemy-bar" id="enemy-hp-bar" style="width:100%"></div>
+                </div>
+                <div class="health-label"><span id="enemy-hp-text">100</span> / <span id="enemy-max-hp-text">100</span> HP</div>
+                <div class="duel-stats">
+                  <span>ATK: <strong id="enemy-atk">10</strong></span>
+                  <span>DEF: <strong id="enemy-def">6</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="duel-actions" id="actions">
+              <button class="btn btn-primary" id="btn-attack" type="button">&#9876; Attack</button>
+              <button class="btn btn-secondary" id="btn-defend" type="button">&#128737; Defend</button>
+              <button class="btn btn-secondary" id="btn-special" type="button">&#9889; Special (<span id="special-count">3</span>)</button>
+            </div>
+
+            <div class="battle-log" id="log-panel">
+              <h3>Battle Log</h3>
+              <div id="log-content" aria-live="polite">
+                <p>A mythic opponent approaches. Choose your move.</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="game-result" class="hidden">
+            <div class="duel-result" id="result-panel">
+              <h2 id="result-title"></h2>
+              <p style="color:var(--color-text-muted); margin-bottom:1.5rem;" id="result-text"></p>
+              <button class="btn btn-primary" id="restart-btn" type="button">Duel Again</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/script.js" defer></script>
+  <script src="../assets/games.js" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      "use strict";
+
+      /* ----- Opponents ----- */
+      var opponents = [
+        { name: "Minotaur of Crete", icon: "\uD83D\uDC02", hp: 100, atk: 11, def: 7, flavor: "The labyrinth-born beast charges with relentless fury." },
+        { name: "Fenrir the Wolf", icon: "\uD83D\uDC3A", hp: 110, atk: 13, def: 5, flavor: "The Great Wolf strains against his chains, hunger in his eyes." },
+        { name: "Set, Lord of Chaos", icon: "\uD83C\uDF2A\uFE0F", hp: 120, atk: 10, def: 9, flavor: "The desert god brings storms and disorder to the arena." },
+        { name: "Cyclops Smith", icon: "\uD83D\uDC41\uFE0F", hp: 90, atk: 14, def: 4, flavor: "A one-eyed giant, forger of divine weapons, now your opponent." },
+        { name: "Sphinx of Thebes", icon: "\uD83E\uDD81", hp: 95, atk: 9, def: 10, flavor: "Answer correctly or be devoured. In combat, she is equally ruthless." }
+      ];
+
+      /* ----- State ----- */
+      var player, enemy, specialLeft, isDefending, gameOver;
+
+      /* ----- DOM refs ----- */
+      var playerHpBar = document.getElementById("player-hp-bar");
+      var playerHpText = document.getElementById("player-hp-text");
+      var playerAtkEl = document.getElementById("player-atk");
+      var playerDefEl = document.getElementById("player-def");
+      var enemyNameEl = document.getElementById("enemy-name");
+      var enemyIconEl = document.getElementById("enemy-icon");
+      var enemyHpBar = document.getElementById("enemy-hp-bar");
+      var enemyHpText = document.getElementById("enemy-hp-text");
+      var enemyMaxHpText = document.getElementById("enemy-max-hp-text");
+      var enemyAtkEl = document.getElementById("enemy-atk");
+      var enemyDefEl = document.getElementById("enemy-def");
+      var specialCountEl = document.getElementById("special-count");
+      var logContent = document.getElementById("log-content");
+      var btnAttack = document.getElementById("btn-attack");
+      var btnDefend = document.getElementById("btn-defend");
+      var btnSpecial = document.getElementById("btn-special");
+      var gameActive = document.getElementById("game-active");
+      var gameResult = document.getElementById("game-result");
+      var resultPanel = document.getElementById("result-panel");
+      var resultTitle = document.getElementById("result-title");
+      var resultText = document.getElementById("result-text");
+      var restartBtn = document.getElementById("restart-btn");
+
+      function initGame() {
+        var opp = GameUtils.pickRandom(opponents);
+
+        player = { hp: 100, maxHp: 100, atk: 12, def: 8 };
+        enemy = { hp: opp.hp, maxHp: opp.hp, atk: opp.atk, def: opp.def, name: opp.name, icon: opp.icon };
+        specialLeft = 3;
+        isDefending = false;
+        gameOver = false;
+
+        // Update UI
+        playerHpText.textContent = player.hp;
+        playerAtkEl.textContent = player.atk;
+        playerDefEl.textContent = player.def;
+
+        enemyNameEl.textContent = enemy.name;
+        enemyIconEl.textContent = enemy.icon;
+        enemyHpText.textContent = enemy.hp;
+        enemyMaxHpText.textContent = enemy.maxHp;
+        enemyAtkEl.textContent = enemy.atk;
+        enemyDefEl.textContent = enemy.def;
+
+        specialCountEl.textContent = specialLeft;
+        btnSpecial.disabled = false;
+
+        updateBars();
+
+        logContent.innerHTML = "<p>" + escapeHtml(opp.flavor) + "</p>";
+
+        gameActive.classList.remove("hidden");
+        gameResult.classList.add("hidden");
+      }
+
+      function updateBars() {
+        playerHpBar.style.width = Math.max(0, (player.hp / player.maxHp) * 100) + "%";
+        enemyHpBar.style.width = Math.max(0, (enemy.hp / enemy.maxHp) * 100) + "%";
+        playerHpText.textContent = Math.max(0, player.hp);
+        enemyHpText.textContent = Math.max(0, enemy.hp);
+      }
+
+      function addLog(msg, cls) {
+        var p = document.createElement("p");
+        if (cls) p.className = cls;
+        p.textContent = msg;
+        logContent.insertBefore(p, logContent.firstChild);
+
+        // Keep log manageable
+        while (logContent.children.length > 20) {
+          logContent.removeChild(logContent.lastChild);
+        }
+      }
+
+      function calcDamage(attackerAtk, defenderDef, multiplier) {
+        var base = attackerAtk * (multiplier || 1);
+        var reduction = defenderDef * 0.4;
+        var dmg = Math.max(1, Math.round(base - reduction + GameUtils.randomInt(-2, 2)));
+        return dmg;
+      }
+
+      function enemyTurn() {
+        if (gameOver) return;
+
+        var moves = ["attack", "attack", "attack", "defend"];
+        var move = GameUtils.pickRandom(moves);
+
+        if (move === "defend") {
+          addLog(enemy.name + " braces for impact, raising their guard.", "log-enemy");
+          // Enemy defend: next player attack does less
+          // We won't track enemy defend state for simplicity — just reduce damage this turn implicitly
+          var reducedDmg = Math.max(1, GameUtils.randomInt(1, 4));
+          player.hp -= reducedDmg;
+          addLog(enemy.name + " deflects and counters for " + reducedDmg + " damage.", "log-enemy");
+        } else {
+          var dmg;
+          if (isDefending) {
+            dmg = Math.max(1, calcDamage(enemy.atk, player.def, 0.5));
+            addLog(enemy.name + " attacks, but your defense holds! Only " + dmg + " damage.", "log-enemy");
+          } else {
+            dmg = calcDamage(enemy.atk, player.def, 1);
+            addLog(enemy.name + " strikes for " + dmg + " damage!", "log-enemy");
+          }
+          player.hp -= dmg;
+        }
+
+        isDefending = false;
+        updateBars();
+        checkEnd();
+      }
+
+      function playerAttack() {
+        if (gameOver) return;
+        isDefending = false;
+        var dmg = calcDamage(player.atk, enemy.def, 1);
+        enemy.hp -= dmg;
+        addLog("You attack for " + dmg + " damage!", "log-player");
+        updateBars();
+        if (!checkEnd()) enemyTurn();
+      }
+
+      function playerDefend() {
+        if (gameOver) return;
+        isDefending = true;
+        addLog("You raise your guard and brace for impact.", "log-player");
+        // Small heal from defending
+        var heal = GameUtils.randomInt(2, 5);
+        player.hp = Math.min(player.maxHp, player.hp + heal);
+        addLog("You steady yourself and recover " + heal + " HP.", "log-player");
+        updateBars();
+        enemyTurn();
+      }
+
+      function playerSpecial() {
+        if (gameOver || specialLeft <= 0) return;
+        isDefending = false;
+        specialLeft--;
+        specialCountEl.textContent = specialLeft;
+        if (specialLeft <= 0) btnSpecial.disabled = true;
+
+        var dmg = calcDamage(player.atk, enemy.def, 1.8);
+        enemy.hp -= dmg;
+        addLog("You unleash a devastating special strike for " + dmg + " damage!", "log-player");
+        updateBars();
+        if (!checkEnd()) enemyTurn();
+      }
+
+      function checkEnd() {
+        if (enemy.hp <= 0) {
+          gameOver = true;
+          enemy.hp = 0;
+          updateBars();
+          setTimeout(function () { showResult(true); }, 600);
+          return true;
+        }
+        if (player.hp <= 0) {
+          gameOver = true;
+          player.hp = 0;
+          updateBars();
+          setTimeout(function () { showResult(false); }, 600);
+          return true;
+        }
+        return false;
+      }
+
+      function showResult(victory) {
+        gameActive.classList.add("hidden");
+        gameResult.classList.remove("hidden");
+
+        if (victory) {
+          resultPanel.className = "duel-result victory";
+          resultTitle.textContent = "Victory!";
+          resultText.textContent = "The " + enemy.name + " falls. You have proven yourself a worthy warrior of myth.";
+        } else {
+          resultPanel.className = "duel-result defeat";
+          resultTitle.textContent = "Defeated";
+          resultText.textContent = "The " + enemy.name + " overwhelms you. The arena fades to darkness. But legends never truly die.";
+        }
+      }
+
+      function escapeHtml(str) {
+        var div = document.createElement("div");
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+      }
+
+      btnAttack.addEventListener("click", playerAttack);
+      btnDefend.addEventListener("click", playerDefend);
+      btnSpecial.addEventListener("click", playerSpecial);
+      restartBtn.addEventListener("click", initGame);
+
+      initGame();
+    });
+  </script>
+</body>
+</html>
