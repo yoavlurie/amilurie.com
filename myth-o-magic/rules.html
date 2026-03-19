@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mythomagic Rules — Ami Lurie</title>
+  <meta name="description" content="Learn how to play Mythomagic — a fast-paced strategy card game where gods, monsters, and heroes battle for control.">
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    .rules-container {
+      max-width: 720px;
+    }
+
+    .rule-section {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      margin-bottom: var(--space-lg);
+    }
+
+    .rule-section h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: var(--space-md);
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .rule-section h2 .rule-icon {
+      font-size: 1.4rem;
+    }
+
+    .rule-section h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: var(--space-lg);
+      margin-bottom: var(--space-sm);
+    }
+
+    .rule-section p {
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      margin-bottom: var(--space-md);
+    }
+
+    .rule-section p:last-child {
+      margin-bottom: 0;
+    }
+
+    .rule-section ul,
+    .rule-section ol {
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      margin-bottom: var(--space-md);
+      padding-left: var(--space-lg);
+    }
+
+    .rule-section li {
+      margin-bottom: var(--space-sm);
+    }
+
+    .rule-section ul:last-child,
+    .rule-section ol:last-child {
+      margin-bottom: 0;
+    }
+
+    .rule-result {
+      background: var(--color-accent-glow);
+      border-left: 3px solid var(--color-accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-md) 0;
+      font-size: 0.95rem;
+      color: var(--color-text);
+    }
+
+    .rule-warning {
+      background: rgba(217, 64, 64, 0.08);
+      border-left: 3px solid var(--color-danger);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-md) 0;
+      font-size: 0.95rem;
+      color: var(--color-text);
+    }
+
+    .rule-tip {
+      background: rgba(45, 138, 78, 0.08);
+      border-left: 3px solid var(--color-success);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-md) 0;
+      font-size: 0.95rem;
+      color: var(--color-text);
+    }
+
+    .rules-intro {
+      font-size: 1.1rem;
+      color: var(--color-text-muted);
+      max-width: 600px;
+      margin-bottom: var(--space-xl);
+      line-height: 1.8;
+    }
+
+    .rules-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--color-accent);
+      margin-bottom: var(--space-lg);
+    }
+
+    .rules-back-link:hover {
+      color: var(--color-accent-light);
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="site-nav" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="nav-links" role="list">
+        <li><a href="../index.html">Home</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../games.html">Games</a></li>
+        <li><a href="../myth-o-magic.html" aria-current="page">Myth-o-Magic</a></li>
+        <li><a href="../adventure.html">Adventure</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section">
+      <div class="container rules-container">
+
+        <a href="../myth-o-magic.html" class="rules-back-link">&larr; Back to Myth-o-Magic</a>
+
+        <header class="page-header">
+          <h1>Mythomagic Rules</h1>
+        </header>
+
+        <p class="rules-intro">Mythomagic is a fast-paced strategy card game where gods, monsters, and heroes battle for control. Two players face off, drawing cards and clashing until one side runs out. Here is everything you need to play.</p>
+
+        <!-- SETUP -->
+        <section class="rule-section" aria-labelledby="rules-setup">
+          <h2 id="rules-setup"><span class="rule-icon" aria-hidden="true">&#127183;</span> Setup</h2>
+          <ul>
+            <li>Each player builds a <strong>60-card deck</strong></li>
+            <li>Each player starts the game with <strong>30 cards</strong> drawn from their deck</li>
+            <li>Shuffle your deck before you begin</li>
+          </ul>
+        </section>
+
+        <!-- HOW A TURN WORKS -->
+        <section class="rule-section" aria-labelledby="rules-turn">
+          <h2 id="rules-turn"><span class="rule-icon" aria-hidden="true">&#128260;</span> How a Turn Works</h2>
+          <ol>
+            <li>Both players <strong>draw one card</strong> from their deck</li>
+            <li>One player is the <strong>Attacker</strong>, the other is the <strong>Defender</strong></li>
+            <li>Roles <strong>alternate every turn</strong> — if you attacked last turn, you defend this turn</li>
+          </ol>
+        </section>
+
+        <!-- SPECIAL ATTACKS -->
+        <section class="rule-section" aria-labelledby="rules-special">
+          <h2 id="rules-special"><span class="rule-icon" aria-hidden="true">&#9889;</span> Special Attacks</h2>
+          <p>Before anyone reveals their card, both players must decide:</p>
+          <ul>
+            <li><strong>Use</strong> their Special Attack, or</li>
+            <li><strong>Don't use</strong> it</li>
+          </ul>
+          <div class="rule-warning">
+            <strong>Important:</strong> You must decide BEFORE cards are revealed. No take-backs.
+          </div>
+        </section>
+
+        <!-- REVEAL AND BATTLE -->
+        <section class="rule-section" aria-labelledby="rules-reveal">
+          <h2 id="rules-reveal"><span class="rule-icon" aria-hidden="true">&#9876;</span> Reveal and Battle</h2>
+          <p>Both players <strong>reveal their cards at the same time</strong>. Then compare:</p>
+
+          <h3>Attacker Wins</h3>
+          <p>If the Attacker's <strong>Attack Points</strong> are greater than the Defender's <strong>Health</strong>:</p>
+          <div class="rule-result">
+            The Attacker <strong>wins the Defender's card</strong> and keeps it.
+          </div>
+
+          <h3>Defender Survives</h3>
+          <p>If the Defender's <strong>Health</strong> is equal to or greater than the Attack Points:</p>
+          <div class="rule-result">
+            Both cards go into the <strong>center pile</strong>.
+          </div>
+        </section>
+
+        <!-- CENTER PILE -->
+        <section class="rule-section" aria-labelledby="rules-center">
+          <h2 id="rules-center"><span class="rule-icon" aria-hidden="true">&#128220;</span> The Center Pile</h2>
+          <p>When neither player wins outright, both cards go into a shared <strong>center pile</strong>.</p>
+          <p>On the <strong>next turn</strong>:</p>
+          <ul>
+            <li>The Defender becomes the new Attacker</li>
+            <li>If they win the next battle, they collect:
+              <ul>
+                <li>The opponent's card</li>
+                <li><strong>All cards</strong> in the center pile</li>
+              </ul>
+            </li>
+          </ul>
+          <div class="rule-tip">
+            <strong>Tip:</strong> The center pile can grow over several turns, making each battle worth more and more.
+          </div>
+        </section>
+
+        <!-- SPECIAL ATTACK RISK -->
+        <section class="rule-section" aria-labelledby="rules-risk">
+          <h2 id="rules-risk"><span class="rule-icon" aria-hidden="true">&#128165;</span> Special Attack Risk</h2>
+          <p>Special Attacks are powerful — but if you use one and <strong>lose</strong>:</p>
+          <div class="rule-warning">
+            Your opponent takes your <strong>battle card</strong> AND <strong>one random card from your deck</strong>.
+          </div>
+          <p>High risk, high reward. Use them wisely.</p>
+        </section>
+
+        <!-- HOW TO WIN -->
+        <section class="rule-section" aria-labelledby="rules-win">
+          <h2 id="rules-win"><span class="rule-icon" aria-hidden="true">&#127942;</span> How to Win</h2>
+          <p>You win when your opponent <strong>runs out of cards</strong>.</p>
+          <p>That's it. No life points. No complicated scoring. Last one standing wins.</p>
+        </section>
+
+        <!-- STRATEGY TIPS -->
+        <section class="rule-section" aria-labelledby="rules-tips">
+          <h2 id="rules-tips"><span class="rule-icon" aria-hidden="true">&#128161;</span> Strategy Tips</h2>
+          <ul>
+            <li><strong>High Attack cards</strong> = aggressive play — try to knock out defenders fast</li>
+            <li><strong>High Health cards</strong> = defensive play — survive and build the center pile in your favor</li>
+            <li><strong>Special Attacks are powerful but risky</strong> — losing with one active costs you an extra card</li>
+            <li><strong>Timing matters</strong> — knowing when to go aggressive and when to play safe is the key to winning</li>
+          </ul>
+          <div class="rule-tip">
+            <strong>Pro tip:</strong> Watch the center pile. When it's stacked high, that's when a well-timed attack can swing the entire game.
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="../assets/script.js" defer></script>
+</body>
+</html>
