@@ -9,21 +9,7 @@
 </head>
 <body>
 
-  <nav class="site-nav" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-links" id="nav-links" role="list">
-        <li><a href="../index.html">Home</a></li>
-        <li><a href="../about.html">About</a></li>
-        <li><a href="../games.html">Games</a></li>
-        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
-        <li><a href="../adventure.html">Adventure</a></li>
-      </ul>
-    </div>
-  </nav>
+  <div id="site-nav"></div>
 
   <main>
     <div class="section">
@@ -67,7 +53,7 @@
             <p style="color:var(--color-text-muted);" id="win-text"></p>
           </div>
 
-          <div class="guess-history" id="history-section" class="hidden">
+          <div class="guess-history" id="history-section">
             <h3>Previous Offerings</h3>
             <div id="history-list"></div>
           </div>
@@ -76,12 +62,9 @@
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
 
+  <script src="../assets/components.js"></script>
   <script src="../assets/script.js" defer></script>
   <script src="../assets/games.js" defer></script>
   <script defer>
@@ -163,7 +146,6 @@
         var secretCopy = SECRET.slice();
         var guessCopy = guess.slice();
 
-        // First pass: correct position
         for (var i = 0; i < 4; i++) {
           if (guessCopy[i] === secretCopy[i]) {
             correctPosition++;
@@ -173,7 +155,6 @@
           }
         }
 
-        // Second pass: correct symbol wrong position
         for (var j = 0; j < 4; j++) {
           if (guessCopy[j] === null) continue;
           var idx = secretCopy.indexOf(guessCopy[j]);
@@ -186,7 +167,6 @@
           }
         }
 
-        // Add to history
         var row = document.createElement("div");
         row.className = "guess-row";
         var symbolsHtml = "";

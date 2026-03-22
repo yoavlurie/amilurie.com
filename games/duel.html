@@ -7,18 +7,106 @@
   <meta name="description" content="Mythic Duel: a turn-based battle against mythic villains. Wield your sword and shield to survive.">
   <link rel="stylesheet" href="../assets/style.css">
   <style>
-    /* ---- Duel v2 Styles ---- */
+    /* ---- Duel v3 — Visual Battle Layout ---- */
 
     .duel-viewport {
-      max-width: 700px;
+      max-width: 720px;
       margin: 0 auto;
     }
 
-    /* -- Villain Display -- */
-    .villain-stage {
-      text-align: center;
+    /* -- Battle Scene: player arm vs enemy -- */
+    .battle-scene {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-md);
       margin-bottom: var(--space-lg);
+      min-height: 200px;
       position: relative;
+      overflow: hidden;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg) var(--space-md);
+    }
+
+    /* Player side */
+    .player-arm {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1;
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .player-weapon-display {
+      font-size: 4rem;
+      line-height: 1;
+      transition: transform 0.3s ease, filter 0.3s ease;
+    }
+
+    .player-shield-display {
+      font-size: 2.5rem;
+      line-height: 1;
+      opacity: 0.4;
+      transition: opacity 0.3s ease, transform 0.3s ease, filter 0.3s ease;
+    }
+
+    .player-shield-display.shield-raised {
+      opacity: 1;
+      transform: scale(1.2);
+      filter: drop-shadow(0 0 12px rgba(107, 95, 199, 0.5));
+    }
+
+    .player-arm.attacking .player-weapon-display {
+      transform: translateX(40px) rotate(25deg);
+      filter: drop-shadow(0 0 14px rgba(217, 64, 64, 0.5));
+    }
+
+    .player-arm.striking .player-weapon-display {
+      transform: translateX(50px) rotate(35deg) scale(1.15);
+      filter: drop-shadow(0 0 20px rgba(212, 160, 23, 0.6));
+    }
+
+    .player-arm.hit {
+      animation: playerHit 0.4s ease;
+    }
+
+    @keyframes playerHit {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(12px); }
+      40% { transform: translateX(-8px); }
+      60% { transform: translateX(5px); }
+      80% { transform: translateX(-3px); }
+    }
+
+    .player-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-text-muted);
+    }
+
+    /* VS divider */
+    .battle-vs {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--color-text-muted);
+      opacity: 0.5;
+      flex-shrink: 0;
+    }
+
+    /* Enemy side */
+    .enemy-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-sm);
+      flex: 1;
+      text-align: center;
     }
 
     .villain-portrait {
@@ -26,11 +114,11 @@
       line-height: 1;
       transition: transform 0.3s ease, filter 0.3s ease;
       display: inline-block;
-      min-height: 90px;
+      min-height: 80px;
     }
 
     .villain-portrait.attacking {
-      transform: scale(1.2) translateY(-6px);
+      transform: scale(1.2) translateX(-8px);
       filter: drop-shadow(0 0 18px rgba(217, 64, 64, 0.5));
     }
 
@@ -52,16 +140,27 @@
     }
 
     .villain-name {
-      font-size: 1.3rem;
+      font-size: 1.1rem;
       font-weight: 700;
-      margin-top: var(--space-sm);
     }
 
     .villain-flavor {
       color: var(--color-text-muted);
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-style: italic;
+    }
+
+    /* Weakness hint */
+    .weakness-hint {
+      font-size: 0.8rem;
+      color: var(--color-warning);
+      font-weight: 600;
       margin-top: var(--space-xs);
+      min-height: 1.2em;
+    }
+
+    .weakness-hint.revealed {
+      animation: fadeIn var(--transition-slow) ease forwards;
     }
 
     /* -- Health Panels -- */
@@ -76,6 +175,13 @@
       .duel-hp-row {
         grid-template-columns: 1fr;
       }
+      .battle-scene {
+        min-height: 160px;
+        padding: var(--space-md) var(--space-sm);
+      }
+      .player-weapon-display { font-size: 3rem; }
+      .player-shield-display { font-size: 2rem; }
+      .villain-portrait { font-size: 3.5rem; }
     }
 
     .hp-panel {
@@ -135,6 +241,16 @@
       color: var(--color-text);
     }
 
+    /* Rage indicator */
+    .rage-warning {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--color-danger);
+      min-height: 1.2em;
+      margin-bottom: var(--space-sm);
+    }
+
     /* -- Weapon Controls -- */
     .weapon-controls {
       display: flex;
@@ -164,18 +280,14 @@
       box-shadow: 0 6px 20px var(--color-card-shadow);
     }
 
-    .weapon-btn:active {
-      transform: translateY(0);
-    }
+    .weapon-btn:active { transform: translateY(0); }
 
     .weapon-btn .weapon-icon {
       line-height: 1;
       transition: transform 0.2s ease;
     }
 
-    .weapon-btn:hover .weapon-icon {
-      transform: scale(1.1);
-    }
+    .weapon-btn:hover .weapon-icon { transform: scale(1.1); }
 
     .weapon-btn .weapon-label {
       font-size: 0.75rem;
@@ -185,9 +297,7 @@
       color: var(--color-text-muted);
     }
 
-    .weapon-btn:hover .weapon-label {
-      color: var(--color-accent);
-    }
+    .weapon-btn:hover .weapon-label { color: var(--color-accent); }
 
     .weapon-sword {
       width: 110px;
@@ -196,18 +306,14 @@
       border-right: 1px solid var(--color-border);
     }
 
-    .weapon-sword .weapon-icon {
-      font-size: 2.8rem;
-    }
+    .weapon-sword .weapon-icon { font-size: 2.8rem; }
 
     .weapon-sword:hover {
       border-color: var(--color-danger);
       background: rgba(217, 64, 64, 0.06);
     }
 
-    .weapon-sword:hover .weapon-label {
-      color: var(--color-danger);
-    }
+    .weapon-sword:hover .weapon-label { color: var(--color-danger); }
 
     .weapon-special {
       width: 90px;
@@ -217,18 +323,14 @@
       border-right: none;
     }
 
-    .weapon-special .weapon-icon {
-      font-size: 2.2rem;
-    }
+    .weapon-special .weapon-icon { font-size: 2.2rem; }
 
     .weapon-special:hover {
       border-color: var(--color-warning);
       background: rgba(212, 160, 23, 0.06);
     }
 
-    .weapon-special:hover .weapon-label {
-      color: var(--color-warning);
-    }
+    .weapon-special:hover .weapon-label { color: var(--color-warning); }
 
     .weapon-special .special-uses {
       font-size: 0.7rem;
@@ -244,9 +346,7 @@
       border-left: 1px solid var(--color-border);
     }
 
-    .weapon-shield .weapon-icon {
-      font-size: 2.8rem;
-    }
+    .weapon-shield .weapon-icon { font-size: 2.8rem; }
 
     .weapon-shield:hover {
       border-color: var(--color-accent);
@@ -265,25 +365,12 @@
       background: var(--color-surface);
     }
 
-    .weapon-btn:disabled:hover .weapon-label {
-      color: var(--color-text-muted);
-    }
+    .weapon-btn:disabled:hover .weapon-label { color: var(--color-text-muted); }
+    .weapon-btn:disabled:hover .weapon-icon { transform: none; }
 
-    .weapon-btn:disabled:hover .weapon-icon {
-      transform: none;
-    }
-
-    .weapon-btn.flash-attack {
-      animation: flashAttack 0.35s ease;
-    }
-
-    .weapon-btn.flash-defend {
-      animation: flashDefend 0.35s ease;
-    }
-
-    .weapon-btn.flash-special {
-      animation: flashSpecial 0.35s ease;
-    }
+    .weapon-btn.flash-attack { animation: flashAttack 0.35s ease; }
+    .weapon-btn.flash-defend { animation: flashDefend 0.35s ease; }
+    .weapon-btn.flash-special { animation: flashSpecial 0.35s ease; }
 
     @keyframes flashAttack {
       0%, 100% { box-shadow: none; }
@@ -325,42 +412,10 @@
       line-height: 1.5;
     }
 
-    .battle-log p:last-child {
-      border-bottom: none;
-    }
-
-    .log-player {
-      color: var(--color-success);
-    }
-
-    .log-enemy {
-      color: var(--color-danger);
-    }
-
-    /* -- Result -- */
-    .duel-result {
-      text-align: center;
-      padding: var(--space-2xl) var(--space-xl);
-    }
-
-    .duel-result h2 {
-      font-size: 2rem;
-      font-weight: 800;
-      margin-bottom: var(--space-md);
-    }
-
-    .duel-result.victory h2 {
-      color: var(--color-success);
-    }
-
-    .duel-result.defeat h2 {
-      color: var(--color-danger);
-    }
-
-    .duel-result .result-villain {
-      font-size: 3rem;
-      margin-bottom: var(--space-md);
-    }
+    .battle-log p:last-child { border-bottom: none; }
+    .log-player { color: var(--color-success); }
+    .log-enemy { color: var(--color-danger); }
+    .log-info { color: var(--color-warning); }
 
     /* -- Turn Indicator -- */
     .turn-indicator {
@@ -375,42 +430,63 @@
       pointer-events: none;
       opacity: 0.5;
     }
+
+    /* -- Result -- */
+    .duel-result {
+      text-align: center;
+      padding: var(--space-2xl) var(--space-xl);
+    }
+
+    .duel-result h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: var(--space-md);
+    }
+
+    .duel-result.victory h2 { color: var(--color-success); }
+    .duel-result.defeat h2 { color: var(--color-danger); }
+
+    .duel-result .result-villain {
+      font-size: 3rem;
+      margin-bottom: var(--space-md);
+    }
+
+    .result-stats {
+      font-size: 0.9rem;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-lg);
+    }
   </style>
 </head>
 <body>
 
-  <nav class="site-nav" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-links" id="nav-links" role="list">
-        <li><a href="../index.html">Home</a></li>
-        <li><a href="../about.html">About</a></li>
-        <li><a href="../games.html">Games</a></li>
-        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
-        <li><a href="../adventure.html">Adventure</a></li>
-      </ul>
-    </div>
-  </nav>
+  <div id="site-nav"></div>
 
   <main>
     <div class="section">
       <div class="container">
         <header class="page-header">
           <h1>Mythic Duel</h1>
-          <p>Face mythic villains in turn-based combat. Click your sword to attack, your shield to defend, or strike between them for a devastating blow.</p>
+          <p>Face mythic villains in turn-based combat. Every enemy has a weakness — discover it to survive. Spam attacks at your peril.</p>
         </header>
 
         <div class="duel-viewport">
 
           <div id="game-active">
-            <!-- Villain Portrait -->
-            <div class="villain-stage" id="villain-stage">
-              <div class="villain-portrait" id="villain-portrait" aria-hidden="true"></div>
-              <div class="villain-name" id="villain-name"></div>
-              <div class="villain-flavor" id="villain-flavor"></div>
+            <!-- Battle Scene: player arm vs enemy -->
+            <div class="battle-scene">
+              <div class="player-arm" id="player-arm">
+                <div class="player-weapon-display" id="player-weapon" aria-hidden="true">&#9876;&#65039;</div>
+                <div class="player-shield-display" id="player-shield" aria-hidden="true">&#128737;&#65039;</div>
+                <div class="player-label">You</div>
+              </div>
+              <div class="battle-vs" aria-hidden="true">VS</div>
+              <div class="enemy-display">
+                <div class="villain-portrait" id="villain-portrait" aria-hidden="true"></div>
+                <div class="villain-name" id="villain-name"></div>
+                <div class="villain-flavor" id="villain-flavor"></div>
+                <div class="weakness-hint" id="weakness-hint"></div>
+              </div>
             </div>
 
             <!-- Health Bars -->
@@ -418,14 +494,14 @@
               <div class="hp-panel">
                 <div class="hp-panel-label">
                   <span>&#9876; Hero</span>
-                  <span class="hp-numbers"><span id="hero-hp">100</span> / 100</span>
+                  <span class="hp-numbers"><span id="hero-hp">80</span> / 80</span>
                 </div>
                 <div class="hp-bar-outer">
                   <div class="hp-bar-inner hero-bar" id="hero-hp-bar" style="width:100%"></div>
                 </div>
                 <div class="hp-stats">
-                  <span>ATK <strong id="hero-atk">12</strong></span>
-                  <span>DEF <strong id="hero-def">8</strong></span>
+                  <span>ATK <strong id="hero-atk">10</strong></span>
+                  <span>DEF <strong id="hero-def">6</strong></span>
                 </div>
               </div>
               <div class="hp-panel">
@@ -443,6 +519,9 @@
               </div>
             </div>
 
+            <!-- Rage Warning -->
+            <div class="rage-warning" id="rage-warning" aria-live="polite"></div>
+
             <!-- Turn Indicator -->
             <div class="turn-indicator" id="turn-indicator">Choose your action</div>
 
@@ -455,7 +534,7 @@
               <button class="weapon-btn weapon-special" id="btn-special" type="button" aria-label="Devastating strike">
                 <span class="weapon-icon" aria-hidden="true">&#9889;</span>
                 <span class="weapon-label">Strike</span>
-                <span class="special-uses" id="special-uses">3 left</span>
+                <span class="special-uses" id="special-uses">2 left</span>
               </button>
               <button class="weapon-btn weapon-shield" id="btn-shield" type="button" aria-label="Defend with shield">
                 <span class="weapon-icon" aria-hidden="true">&#128737;&#65039;</span>
@@ -476,7 +555,8 @@
             <div class="duel-result" id="result-panel">
               <div class="result-villain" id="result-villain-icon"></div>
               <h2 id="result-title"></h2>
-              <p style="color:var(--color-text-muted); margin-bottom:var(--space-lg);" id="result-text"></p>
+              <p style="color:var(--color-text-muted); margin-bottom:var(--space-sm);" id="result-text"></p>
+              <p class="result-stats" id="result-stats"></p>
               <button class="btn btn-primary" id="restart-btn" type="button">Duel Again</button>
             </div>
           </div>
@@ -486,12 +566,9 @@
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
 
+  <script src="../assets/components.js"></script>
   <script src="../assets/script.js" defer></script>
   <script src="../assets/games.js" defer></script>
   <script defer>
@@ -499,101 +576,120 @@
       "use strict";
 
       /* ================================================
-         VILLAINS
-         Each has: name, idle icon, attack icon,
-         defend icon (optional), hp, atk, def, flavor
+         VILLAINS — each has a weakness the player must
+         discover. Weakness types:
+           "after_defend" = vulnerable right after YOU defend
+           "after_attack" = vulnerable right after YOU attack
+           "low_hp"       = vulnerable when below 40% HP
+           "special_only" = only specials deal real damage
          ================================================ */
       var villains = [
         {
           name: "Set, Lord of Chaos",
-          idle: "\uD83C\uDF2A\uFE0F",
-          attack: "\uD83D\uDD25",
-          defend: "\uD83D\uDEE1\uFE0F",
-          hp: 110, atk: 11, def: 8,
-          flavor: "The desert god raises a hand crackling with storm fire."
+          idle: "\uD83C\uDF2A\uFE0F", attack: "\uD83D\uDD25", defend: "\uD83D\uDEE1\uFE0F",
+          hp: 100, atk: 13, def: 7,
+          flavor: "The desert god raises a hand crackling with storm fire.",
+          weakness: "after_defend",
+          weaknessHint: "He drops his guard after you raise your shield...",
+          weaknessBonusMult: 2.0
         },
         {
           name: "Nyx, Primordial Night",
-          idle: "\uD83C\uDF11",
-          attack: "\uD83C\uDF0C",
-          defend: "\uD83C\uDF03",
-          hp: 100, atk: 10, def: 10,
-          flavor: "Darkness itself takes form. Even the gods fear Nyx."
+          idle: "\uD83C\uDF11", attack: "\uD83C\uDF0C", defend: "\uD83C\uDF03",
+          hp: 90, atk: 14, def: 9,
+          flavor: "Darkness itself takes form. Even the gods fear Nyx.",
+          weakness: "special_only",
+          weaknessHint: "Normal blades pass through her shadow form...",
+          weaknessBonusMult: 1.0
         },
         {
           name: "Apophis, the Chaos Serpent",
-          idle: "\uD83D\uDC0D",
-          attack: "\u2604\uFE0F",
-          defend: "\uD83C\uDF00",
-          hp: 120, atk: 12, def: 6,
-          flavor: "The world-serpent coils to swallow the sun."
+          idle: "\uD83D\uDC0D", attack: "\u2604\uFE0F", defend: "\uD83C\uDF00",
+          hp: 110, atk: 14, def: 5,
+          flavor: "The world-serpent coils to swallow the sun.",
+          weakness: "after_defend",
+          weaknessHint: "He overextends after you block his strike...",
+          weaknessBonusMult: 1.8
         },
         {
           name: "Cerberus, Hound of Hades",
-          idle: "\uD83D\uDC3A",
-          attack: "\uD83D\uDD25",
-          defend: "\uD83E\uDDB4",
-          hp: 105, atk: 13, def: 5,
-          flavor: "Three heads snarl. No soul escapes the underworld gate."
+          idle: "\uD83D\uDC3A", attack: "\uD83D\uDD25", defend: "\uD83E\uDDB4",
+          hp: 95, atk: 15, def: 4,
+          flavor: "Three heads snarl. No soul escapes the underworld gate.",
+          weakness: "after_attack",
+          weaknessHint: "His three heads fight over prey after you swing...",
+          weaknessBonusMult: 1.8
         },
         {
           name: "Kronos, Lord of Time",
-          idle: "\u231B",
-          attack: "\uD83D\uDDE1\uFE0F",
-          defend: "\u23F3",
-          hp: 130, atk: 10, def: 9,
-          flavor: "The Titan king wields a scythe that cuts through time itself."
+          idle: "\u231B", attack: "\uD83D\uDDE1\uFE0F", defend: "\u23F3",
+          hp: 120, atk: 11, def: 10,
+          flavor: "The Titan king wields a scythe that cuts through time itself.",
+          weakness: "low_hp",
+          weaknessHint: "His time-shield weakens as his power fades...",
+          weaknessBonusMult: 2.2
         },
         {
           name: "Loki, the Trickster",
-          idle: "\uD83C\uDFAD",
-          attack: "\uD83D\uDD2A",
-          defend: "\uD83D\uDCA8",
-          hp: 95, atk: 11, def: 7,
-          flavor: "Silver-tongued and unpredictable. He fights with cunning."
+          idle: "\uD83C\uDFAD", attack: "\uD83D\uDD2A", defend: "\uD83D\uDCA8",
+          hp: 85, atk: 13, def: 6,
+          flavor: "Silver-tongued and unpredictable. He fights with cunning.",
+          weakness: "after_defend",
+          weaknessHint: "His illusions falter when you stand firm...",
+          weaknessBonusMult: 2.0
         },
         {
           name: "Sobek, Crocodile God",
-          idle: "\uD83D\uDC0A",
-          attack: "\uD83C\uDF0A",
-          defend: "\uD83E\uDEA8",
-          hp: 115, atk: 12, def: 7,
-          flavor: "The Nile's guardian lunges with jaws that crush stone."
+          idle: "\uD83D\uDC0A", attack: "\uD83C\uDF0A", defend: "\uD83E\uDEA8",
+          hp: 105, atk: 14, def: 6,
+          flavor: "The Nile's guardian lunges with jaws that crush stone.",
+          weakness: "after_attack",
+          weaknessHint: "He leaves his belly exposed after lunging at you...",
+          weaknessBonusMult: 1.8
         },
         {
           name: "Medusa, the Gorgon",
-          idle: "\uD83D\uDC0D",
-          attack: "\uD83D\uDC40",
-          defend: "\uD83E\uDEB6",
-          hp: 90, atk: 13, def: 6,
-          flavor: "Do not meet her gaze. One look turns flesh to stone."
+          idle: "\uD83D\uDC0D", attack: "\uD83D\uDC40", defend: "\uD83E\uDEB6",
+          hp: 80, atk: 16, def: 4,
+          flavor: "Do not meet her gaze. One look turns flesh to stone.",
+          weakness: "after_defend",
+          weaknessHint: "Her gaze bounces off your shield, stunning her...",
+          weaknessBonusMult: 2.2
         },
         {
           name: "Typhon, Father of Monsters",
-          idle: "\uD83D\uDC32",
-          attack: "\uD83C\uDF0B",
-          defend: "\uD83C\uDF2A\uFE0F",
-          hp: 140, atk: 14, def: 5,
-          flavor: "The earth shakes. The most fearsome creature in all mythology rises."
+          idle: "\uD83D\uDC32", attack: "\uD83C\uDF0B", defend: "\uD83C\uDF2A\uFE0F",
+          hp: 130, atk: 13, def: 8,
+          flavor: "The earth shakes. The most fearsome creature in all mythology rises.",
+          weakness: "low_hp",
+          weaknessHint: "His fire dims as his strength wanes...",
+          weaknessBonusMult: 2.0
         },
         {
           name: "Chimera, the Three-Formed",
-          idle: "\uD83E\uDD81",
-          attack: "\uD83D\uDD25",
-          defend: "\uD83D\uDCA8",
-          hp: 100, atk: 12, def: 7,
-          flavor: "Lion, goat, serpent — three beasts fused into one horror."
+          idle: "\uD83E\uDD81", attack: "\uD83D\uDD25", defend: "\uD83D\uDCA8",
+          hp: 95, atk: 14, def: 6,
+          flavor: "Lion, goat, serpent — three beasts fused into one horror.",
+          weakness: "after_attack",
+          weaknessHint: "Her three heads argue after you provoke them...",
+          weaknessBonusMult: 1.9
         }
       ];
 
       /* ---- State ---- */
       var player, enemy, specialLeft, isDefending, gameOver, actionLocked;
+      var consecutiveAttacks, turnsPlayed, weaknessRevealed, lastPlayerAction;
 
       /* ---- DOM refs ---- */
+      var playerArm = document.getElementById("player-arm");
+      var playerWeapon = document.getElementById("player-weapon");
+      var playerShieldEl = document.getElementById("player-shield");
+
       var villainPortrait = document.getElementById("villain-portrait");
       var villainNameEl = document.getElementById("villain-name");
       var villainFlavorEl = document.getElementById("villain-flavor");
       var villainLabelName = document.getElementById("villain-label-name");
+      var weaknessHintEl = document.getElementById("weakness-hint");
 
       var heroHp = document.getElementById("hero-hp");
       var heroHpBar = document.getElementById("hero-hp-bar");
@@ -606,6 +702,7 @@
       var villainAtkEl = document.getElementById("villain-atk");
       var villainDefEl = document.getElementById("villain-def");
 
+      var rageWarning = document.getElementById("rage-warning");
       var turnIndicator = document.getElementById("turn-indicator");
       var specialUsesEl = document.getElementById("special-uses");
       var weaponControls = document.getElementById("weapon-controls");
@@ -619,6 +716,7 @@
       var resultPanel = document.getElementById("result-panel");
       var resultTitle = document.getElementById("result-title");
       var resultText = document.getElementById("result-text");
+      var resultStats = document.getElementById("result-stats");
       var resultVillainIcon = document.getElementById("result-villain-icon");
       var restartBtn = document.getElementById("restart-btn");
 
@@ -626,29 +724,38 @@
       function initGame() {
         var v = GameUtils.pickRandom(villains);
 
-        player = { hp: 100, maxHp: 100, atk: 12, def: 8 };
+        player = { hp: 80, maxHp: 80, atk: 10, def: 6 };
         enemy = {
           hp: v.hp, maxHp: v.hp, atk: v.atk, def: v.def,
           name: v.name, idle: v.idle, attack: v.attack,
-          defend: v.defend
+          defend: v.defend, weakness: v.weakness,
+          weaknessHint: v.weaknessHint,
+          weaknessBonusMult: v.weaknessBonusMult
         };
-        specialLeft = 3;
+        specialLeft = 2;
         isDefending = false;
         gameOver = false;
         actionLocked = false;
+        consecutiveAttacks = 0;
+        turnsPlayed = 0;
+        weaknessRevealed = false;
+        lastPlayerAction = "";
 
-        // Villain display
+        // Visual displays
         villainPortrait.textContent = v.idle;
         villainPortrait.className = "villain-portrait";
         villainNameEl.textContent = v.name;
         villainFlavorEl.textContent = v.flavor;
         villainLabelName.textContent = v.name;
+        weaknessHintEl.textContent = "";
+        weaknessHintEl.className = "weakness-hint";
 
-        // Hero stats
+        playerArm.className = "player-arm";
+        playerShieldEl.className = "player-shield-display";
+
+        // Stats display
         heroAtkEl.textContent = player.atk;
         heroDefEl.textContent = player.def;
-
-        // Villain stats
         villainAtkEl.textContent = enemy.atk;
         villainDefEl.textContent = enemy.def;
         villainMaxHpEl.textContent = enemy.maxHp;
@@ -656,6 +763,8 @@
         // Special
         specialUsesEl.textContent = specialLeft + " left";
         btnSpecial.disabled = false;
+
+        rageWarning.textContent = "";
 
         updateBars();
         setWeaponsEnabled(true);
@@ -683,6 +792,32 @@
         }
       }
 
+      /* ---- Check if weakness is active ---- */
+      function isWeaknessActive() {
+        switch (enemy.weakness) {
+          case "after_defend":
+            return lastPlayerAction === "defend";
+          case "after_attack":
+            return lastPlayerAction === "attack";
+          case "low_hp":
+            return (enemy.hp / enemy.maxHp) < 0.4;
+          case "special_only":
+            return false; // handled separately
+          default:
+            return false;
+        }
+      }
+
+      /* ---- Reveal weakness after defending ---- */
+      function maybeRevealWeakness() {
+        if (!weaknessRevealed && turnsPlayed >= 2) {
+          weaknessRevealed = true;
+          weaknessHintEl.textContent = enemy.weaknessHint;
+          weaknessHintEl.className = "weakness-hint revealed";
+          addLog("You notice something: " + enemy.weaknessHint, "log-info");
+        }
+      }
+
       /* ---- Villain portrait states ---- */
       function showVillainIdle() {
         villainPortrait.textContent = enemy.idle;
@@ -703,6 +838,34 @@
         villainPortrait.className = "villain-portrait hit";
         setTimeout(function () {
           if (!gameOver) showVillainIdle();
+        }, 500);
+      }
+
+      /* ---- Player arm animations ---- */
+      function showPlayerAttack() {
+        playerArm.className = "player-arm attacking";
+        playerShieldEl.className = "player-shield-display";
+        setTimeout(function () {
+          if (!gameOver) playerArm.className = "player-arm";
+        }, 400);
+      }
+
+      function showPlayerStrike() {
+        playerArm.className = "player-arm striking";
+        playerShieldEl.className = "player-shield-display";
+        setTimeout(function () {
+          if (!gameOver) playerArm.className = "player-arm";
+        }, 500);
+      }
+
+      function showPlayerDefend() {
+        playerShieldEl.className = "player-shield-display shield-raised";
+      }
+
+      function showPlayerHit() {
+        playerArm.className = "player-arm hit";
+        setTimeout(function () {
+          if (!gameOver) playerArm.className = "player-arm";
         }, 500);
       }
 
@@ -732,6 +895,21 @@
         return Math.max(1, Math.round(base - red + GameUtils.randomInt(-2, 2)));
       }
 
+      /* ---- Rage from attack spamming ---- */
+      function getRageBonus() {
+        if (consecutiveAttacks >= 4) return 1.6;
+        if (consecutiveAttacks >= 3) return 1.3;
+        return 1.0;
+      }
+
+      function updateRageWarning() {
+        if (consecutiveAttacks >= 3) {
+          rageWarning.textContent = "The enemy senses your recklessness! +" + Math.round((getRageBonus() - 1) * 100) + "% enemy damage!";
+        } else {
+          rageWarning.textContent = "";
+        }
+      }
+
       /* ---- Enemy turn ---- */
       function enemyTurn() {
         if (gameOver) return;
@@ -742,42 +920,43 @@
         setTimeout(function () {
           if (gameOver) return;
 
+          var rage = getRageBonus();
           var roll = GameUtils.randomInt(1, 10);
-          // 60% attack, 25% defend, 15% special-ish heavy hit
-          if (roll <= 6) {
-            // Attack
+
+          if (roll <= 7) {
+            // Attack (70% chance)
             showVillainAttack();
+            showPlayerHit();
             var dmg;
             if (isDefending) {
-              dmg = Math.max(1, calcDamage(enemy.atk, player.def, 0.45));
+              dmg = Math.max(1, calcDamage(enemy.atk, player.def, 0.3 * rage));
               addLog(enemy.name + " attacks! Your shield absorbs the blow. Only " + dmg + " damage.", "log-enemy");
             } else {
-              dmg = calcDamage(enemy.atk, player.def, 1);
+              dmg = calcDamage(enemy.atk, player.def, 1.0 * rage);
               addLog(enemy.name + " strikes you for " + dmg + " damage!", "log-enemy");
             }
             player.hp -= dmg;
           } else if (roll <= 8) {
-            // Defend
+            // Defend + counter
             showVillainDefend();
             addLog(enemy.name + " braces and guards, recovering strength.", "log-enemy");
-            var counterDmg = Math.max(1, GameUtils.randomInt(1, 3));
-            player.hp -= counterDmg;
-            addLog(enemy.name + " counters for " + counterDmg + " damage.", "log-enemy");
           } else {
-            // Heavy hit
+            // Heavy hit (20% chance)
             showVillainAttack();
+            showPlayerHit();
             var heavyDmg;
             if (isDefending) {
-              heavyDmg = Math.max(1, calcDamage(enemy.atk, player.def, 0.8));
+              heavyDmg = Math.max(1, calcDamage(enemy.atk, player.def, 0.7 * rage));
               addLog(enemy.name + " unleashes a powerful blow! Your shield cracks but holds. " + heavyDmg + " damage.", "log-enemy");
             } else {
-              heavyDmg = calcDamage(enemy.atk, player.def, 1.4);
+              heavyDmg = calcDamage(enemy.atk, player.def, 1.6 * rage);
               addLog(enemy.name + " unleashes a devastating blow for " + heavyDmg + " damage!", "log-enemy");
             }
             player.hp -= heavyDmg;
           }
 
           isDefending = false;
+          playerShieldEl.className = "player-shield-display";
           updateBars();
 
           setTimeout(function () {
@@ -795,13 +974,33 @@
         if (gameOver || actionLocked) return;
         isDefending = false;
         setWeaponsEnabled(false);
+        turnsPlayed++;
+        consecutiveAttacks++;
+        lastPlayerAction = "attack";
+        updateRageWarning();
 
         flashWeapon(btnSword, "flash-attack");
+        showPlayerAttack();
         showVillainHit();
 
-        var dmg = calcDamage(player.atk, enemy.def, 1);
+        var mult = 1;
+        var bonusMsg = "";
+
+        // Weakness check
+        if (isWeaknessActive()) {
+          mult = enemy.weaknessBonusMult;
+          bonusMsg = " (weakness exploited!)";
+        }
+
+        // Nyx special: normal attacks do half damage
+        if (enemy.weakness === "special_only") {
+          mult = 0.4;
+          bonusMsg = " (your blade passes through shadow...)";
+        }
+
+        var dmg = calcDamage(player.atk, enemy.def, mult);
         enemy.hp -= dmg;
-        addLog("You swing your sword for " + dmg + " damage!", "log-player");
+        addLog("You swing your sword for " + dmg + " damage!" + bonusMsg, "log-player");
         turnIndicator.textContent = "You attack!";
         updateBars();
 
@@ -814,14 +1013,22 @@
         if (gameOver || actionLocked) return;
         isDefending = true;
         setWeaponsEnabled(false);
+        turnsPlayed++;
+        consecutiveAttacks = 0; // reset attack spam counter
+        lastPlayerAction = "defend";
+        updateRageWarning();
 
         flashWeapon(btnShield, "flash-defend");
+        showPlayerDefend();
 
-        var heal = GameUtils.randomInt(3, 6);
+        var heal = GameUtils.randomInt(4, 8);
         player.hp = Math.min(player.maxHp, player.hp + heal);
         addLog("You raise your shield and recover " + heal + " HP.", "log-player");
         turnIndicator.textContent = "You defend!";
         updateBars();
+
+        // Defending reveals weakness after a couple turns
+        maybeRevealWeakness();
 
         setTimeout(function () {
           if (!checkEnd()) enemyTurn();
@@ -832,17 +1039,37 @@
         if (gameOver || actionLocked || specialLeft <= 0) return;
         isDefending = false;
         setWeaponsEnabled(false);
+        turnsPlayed++;
+        consecutiveAttacks = 0; // specials reset spam
+        lastPlayerAction = "special";
+        updateRageWarning();
 
         specialLeft--;
         specialUsesEl.textContent = specialLeft + " left";
         if (specialLeft <= 0) btnSpecial.disabled = true;
 
         flashWeapon(btnSpecial, "flash-special");
+        showPlayerStrike();
         showVillainHit();
 
-        var dmg = calcDamage(player.atk, enemy.def, 1.9);
+        var mult = 1.8;
+        var bonusMsg = "";
+
+        // Weakness check
+        if (isWeaknessActive()) {
+          mult = enemy.weaknessBonusMult + 0.8;
+          bonusMsg = " (weakness exploited!)";
+        }
+
+        // Nyx: specials work full strength
+        if (enemy.weakness === "special_only") {
+          mult = 2.5;
+          bonusMsg = " (lightning pierces the shadow!)";
+        }
+
+        var dmg = calcDamage(player.atk, enemy.def, mult);
         enemy.hp -= dmg;
-        addLog("Devastating strike! You deal " + dmg + " damage!", "log-player");
+        addLog("Devastating strike! You deal " + dmg + " damage!" + bonusMsg, "log-player");
         turnIndicator.textContent = "Devastating strike!";
         updateBars();
 
@@ -874,6 +1101,8 @@
         gameActive.classList.add("hidden");
         gameResult.classList.remove("hidden");
         resultVillainIcon.textContent = enemy.idle;
+
+        resultStats.textContent = "Turns: " + turnsPlayed + " | Weakness: " + (weaknessRevealed ? "Discovered" : "Hidden");
 
         if (victory) {
           resultPanel.className = "duel-result victory";

@@ -9,21 +9,7 @@
 </head>
 <body>
 
-  <nav class="site-nav" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a href="../index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-links" id="nav-links" role="list">
-        <li><a href="../index.html">Home</a></li>
-        <li><a href="../about.html">About</a></li>
-        <li><a href="../games.html">Games</a></li>
-        <li><a href="../myth-o-magic.html">Myth-o-Magic</a></li>
-        <li><a href="../adventure.html">Adventure</a></li>
-      </ul>
-    </div>
-  </nav>
+  <div id="site-nav"></div>
 
   <main>
     <div class="section">
@@ -57,12 +43,9 @@
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
 
+  <script src="../assets/components.js"></script>
   <script src="../assets/script.js" defer></script>
   <script defer>
     document.addEventListener("DOMContentLoaded", function () {
@@ -230,7 +213,6 @@
           btn.textContent = name;
           btn.type = "button";
           btn.addEventListener("click", function () {
-            // Update active state
             figureList.querySelectorAll(".figure-btn").forEach(function (b) {
               b.classList.remove("active");
             });
@@ -250,16 +232,12 @@
           var html = "";
           html += '<h2>' + escapeHtml(name) + '</h2>';
           html += '<div class="figure-domain">' + escapeHtml(fig.domain) + '</div>';
-
           html += '<div class="figure-section"><h3>Story</h3>';
           html += '<p>' + escapeHtml(fig.summary) + '</p></div>';
-
           html += '<div class="figure-section"><h3>Powers</h3>';
           html += '<p>' + escapeHtml(fig.powers) + '</p></div>';
-
           html += '<div class="figure-section"><h3>Famous Myth</h3>';
           html += '<p>' + escapeHtml(fig.famousMyth) + '</p></div>';
-
           html += '<div class="figure-section"><h3>Symbols</h3>';
           html += '<p>' + escapeHtml(fig.symbol) + '</p></div>';
 

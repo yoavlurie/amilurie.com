@@ -9,21 +9,7 @@
 </head>
 <body>
 
-  <nav class="site-nav" aria-label="Main navigation">
-    <div class="nav-inner">
-      <a href="index.html" class="nav-logo" aria-label="Ami Lurie — Home">AL</a>
-      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Toggle navigation">
-        <span></span><span></span><span></span>
-      </button>
-      <ul class="nav-links" id="nav-links" role="list">
-        <li><a href="index.html" aria-current="page">Home</a></li>
-        <li><a href="about.html">About</a></li>
-        <li><a href="games.html">Games</a></li>
-        <li><a href="myth-o-magic.html">Myth-o-Magic</a></li>
-        <li><a href="adventure.html">Adventure</a></li>
-      </ul>
-    </div>
-  </nav>
+  <div id="site-nav"></div>
 
   <main>
     <section class="hero">
@@ -67,12 +53,9 @@
     <div class="section-tagline">"Every world starts with one idea."</div>
   </main>
 
-  <footer class="site-footer">
-    <div class="container">
-      <p>&copy; <span id="footer-year"></span> Ami Lurie. All rights reserved.</p>
-    </div>
-  </footer>
+  <div id="site-footer"></div>
 
+  <script src="assets/components.js"></script>
   <script src="assets/script.js" defer></script>
 </body>
 </html>
