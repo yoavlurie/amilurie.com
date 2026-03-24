@@ -4,142 +4,105 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Mythic Duel — Ami Lurie</title>
-  <meta name="description" content="Mythic Duel: a real-time arena battle against mythic villains. Choose your hero and fight through 10 legendary foes.">
+  <meta name="description" content="Mythic Duel: a real-time arena RPG. Choose your hero, explore the world, complete quests, and fight 50+ mythic villains.">
   <link rel="stylesheet" href="../assets/style.css">
   <style>
-    .duel-viewport {
-      max-width: 720px;
-      margin: 0 auto;
-      position: relative;
-    }
-
+    .duel-viewport { max-width: 720px; margin: 0 auto; position: relative; }
     #game-canvas {
-      width: 100%;
-      max-width: 720px;
-      height: auto;
-      aspect-ratio: 720 / 400;
-      background: #0f0e17;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--color-border);
-      display: block;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+      width: 100%; max-width: 720px; height: auto; aspect-ratio: 720 / 400;
+      background: #0f0e17; border-radius: var(--radius-lg); border: 1px solid var(--color-border);
+      display: block; image-rendering: pixelated; image-rendering: crisp-edges;
     }
-
-    #game-canvas:focus {
-      outline: 2px solid var(--color-accent);
-      outline-offset: 2px;
-    }
-
-    /* Touch controls */
+    #game-canvas:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
     .touch-overlay {
-      display: none;
-      position: absolute;
-      bottom: 8px;
-      left: 8px;
-      right: 8px;
-      justify-content: space-between;
-      align-items: flex-end;
-      pointer-events: none;
-      z-index: 10;
+      display: none; position: absolute; bottom: 8px; left: 8px; right: 8px;
+      justify-content: space-between; align-items: flex-end; pointer-events: none; z-index: 10;
     }
-
-    .touch-overlay.visible {
-      display: flex;
-    }
-
-    .touch-group {
-      display: flex;
-      gap: 6px;
-      pointer-events: auto;
-    }
-
+    .touch-overlay.visible { display: flex; }
+    .touch-group { display: flex; gap: 6px; pointer-events: auto; }
     .touch-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.4);
-      background: rgba(0,0,0,0.4);
-      color: rgba(255,255,255,0.7);
-      font-size: 0.75rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: manipulation;
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.4);
+      color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation;
     }
-
     .touch-btn:active, .touch-btn.pressed {
-      background: rgba(255,255,255,0.2);
-      border-color: rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.7);
     }
-
     .touch-dpad {
-      display: grid;
-      grid-template-columns: 48px 48px 48px;
-      grid-template-rows: 48px 48px;
-      gap: 4px;
-      pointer-events: auto;
+      display: grid; grid-template-columns: 44px 44px 44px; grid-template-rows: 44px 44px;
+      gap: 3px; pointer-events: auto;
     }
-
     .touch-dpad .touch-up { grid-column: 2; grid-row: 1; }
     .touch-dpad .touch-left { grid-column: 1; grid-row: 2; }
+    .touch-dpad .touch-down { grid-column: 2; grid-row: 2; }
     .touch-dpad .touch-right { grid-column: 3; grid-row: 2; }
-
     .controls-hint {
-      text-align: center;
-      margin-top: var(--space-sm);
-      font-size: 0.8rem;
-      color: var(--color-text-muted);
+      text-align: center; margin-top: var(--space-sm); font-size: 0.8rem; color: var(--color-text-muted);
     }
   </style>
 </head>
 <body>
-
   <div id="site-nav"></div>
-
   <main>
     <div class="section">
       <div class="container">
         <header class="page-header">
           <h1>Mythic Duel</h1>
-          <p>A real-time arena battle against mythic villains. Choose your hero, learn enemy weaknesses, and fight your way through 10 legendary foes.</p>
+          <p>A real-time arena RPG. Choose your hero, explore the mythic world, complete quests, and fight 50+ legendary villains from Percy Jackson, Heroes of Olympus, Kane Chronicles, Magnus Chase, and Trials of Apollo.</p>
         </header>
-
         <div class="duel-viewport">
           <canvas id="game-canvas" width="720" height="400" tabindex="0" aria-label="Mythic Duel game arena"></canvas>
-
           <div id="touch-controls" class="touch-overlay">
             <div class="touch-dpad">
               <button class="touch-btn touch-up" data-action="jump" aria-label="Jump">&#9650;</button>
               <button class="touch-btn touch-left" data-action="left" aria-label="Move left">&#9664;</button>
+              <button class="touch-btn touch-down" data-action="down" aria-label="Duck">&#9660;</button>
               <button class="touch-btn touch-right" data-action="right" aria-label="Move right">&#9654;</button>
             </div>
             <div class="touch-group">
               <button class="touch-btn" data-action="attack" aria-label="Attack">ATK</button>
               <button class="touch-btn" data-action="block" aria-label="Block">DEF</button>
               <button class="touch-btn" data-action="special" aria-label="Special">SPL</button>
+              <button class="touch-btn" data-action="flee" aria-label="Flee">RUN</button>
             </div>
           </div>
-
-          <p class="controls-hint" id="controls-hint">WASD/Arrows: Move &amp; Jump &middot; Space: Attack &middot; Shift: Block &middot; E: Special</p>
+          <p class="controls-hint" id="controls-hint">WASD: Move &amp; Jump &middot; S: Duck &middot; Space: Attack &middot; Shift: Block &middot; E: Special &middot; Q: Flee &middot; Tab: Quests</p>
         </div>
       </div>
     </div>
   </main>
-
   <div id="site-footer"></div>
 
   <script src="../assets/components.js"></script>
   <script src="../assets/script.js" defer></script>
   <script src="../assets/games.js" defer></script>
-  <script src="../assets/duel/sprites.js" defer></script>
-  <script src="../assets/duel/controls.js" defer></script>
-  <script src="../assets/duel/combat.js" defer></script>
-  <script src="../assets/duel/enemies.js" defer></script>
+  <!-- Core -->
+  <script src="../assets/duel/core/utils.js" defer></script>
+  <script src="../assets/duel/core/controls.js" defer></script>
+  <script src="../assets/duel/core/entity.js" defer></script>
+  <script src="../assets/duel/core/physics.js" defer></script>
+  <script src="../assets/duel/core/camera.js" defer></script>
+  <!-- Data -->
+  <script src="../assets/duel/data/palettes.js" defer></script>
+  <script src="../assets/duel/data/hero-sprites.js" defer></script>
+  <script src="../assets/duel/data/hero-defs.js" defer></script>
+  <script src="../assets/duel/data/enemy-sprites.js" defer></script>
+  <script src="../assets/duel/data/enemy-defs.js" defer></script>
+  <script src="../assets/duel/data/arenas.js" defer></script>
+  <script src="../assets/duel/data/locations.js" defer></script>
+  <script src="../assets/duel/data/quests.js" defer></script>
+  <script src="../assets/duel/data/battles.js" defer></script>
+  <!-- Systems -->
+  <script src="../assets/duel/systems/status.js" defer></script>
+  <script src="../assets/duel/systems/ai.js" defer></script>
+  <script src="../assets/duel/systems/progression.js" defer></script>
+  <script src="../assets/duel/systems/quests-engine.js" defer></script>
+  <script src="../assets/duel/systems/waves.js" defer></script>
+  <script src="../assets/duel/systems/worldmap.js" defer></script>
+  <!-- Engine (last) -->
+  <script src="../assets/duel/core/combat.js" defer></script>
   <script src="../assets/duel/engine.js" defer></script>
 </body>
 </html>
