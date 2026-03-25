@@ -116,9 +116,15 @@
           gameState = "SELECT";
         });
       } else {
-        /* Villain path */
-        showDialogue("Tartarus", "Welcome, creature of darkness... I am Tartarus, the Pit itself. You shall be my champion. Rise from the abyss and destroy the heroes above!", "#c83030", function () {
+        /* Villain path — start with Alecto and Minotaur as playable */
+        DuelProgression.get().unlockedVillains = ["alecto", "minotaur"];
+        DuelProgression.get().currentLocation = "tartarus";
+        DuelProgression.unlockLocation("tartarus");
+        DuelProgression.unlockLocation("underworld");
+        DuelProgression.save();
+        showDialogue("Tartarus", "Welcome, creature of darkness... I am Tartarus, the Pit itself. You shall be my champion. Choose your form — Alecto the Fury, or the mighty Minotaur — and rise to destroy the heroes above!", "#c83030", function () {
           isVillainMode = true;
+          villainSelectIndex = 0;
           gameState = "VILLAIN_SEL";
         });
       }
@@ -868,24 +874,48 @@
   function renderVillainSelect() {
     ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
     ctx.fillStyle = "#c83030"; ctx.font = "bold 24px monospace"; ctx.textAlign = "center";
-    ctx.fillText("Villain Mode", CW / 2, 30);
+    ctx.fillText("Choose Your Form", CW / 2, 40);
     ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
-    ctx.fillText("Play as a defeated villain vs hero AI", CW / 2, 50);
+    ctx.fillText("Tartarus commands you: pick your champion of darkness", CW / 2, 62);
+
     var villains = DuelProgression.get().unlockedVillains;
+    var cardW = 200, gap = 30;
+    var totalW = villains.length * cardW + (villains.length - 1) * gap;
+    var startX = (CW - totalW) / 2;
+
     for (var i = 0; i < villains.length; i++) {
       var vDef = DuelEnemyDefs.getById(villains[i]);
       if (!vDef) continue;
       var sel = i === villainSelectIndex;
-      var y = 70 + i * 35;
-      ctx.fillStyle = sel ? "#1a1930" : "#12111f";
+      var cx = startX + i * (cardW + gap);
+
+      ctx.fillStyle = sel ? "#2a1a1a" : "#12111f";
       ctx.strokeStyle = sel ? "#c83030" : "#2a2845";
-      ctx.lineWidth = sel ? 2 : 1;
-      DuelUtils.roundRect(ctx, 100, y, CW - 200, 30, 4);
-      ctx.fillStyle = sel ? "#e8e6f0" : "#9a96b0"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left";
-      ctx.fillText(vDef.name + " \u2014 " + vDef.subtitle, 110, y + 20);
+      ctx.lineWidth = sel ? 3 : 1;
+      DuelUtils.roundRect(ctx, cx, 90, cardW, 200, 10);
+
+      /* Sprite */
+      var esprites = DuelEnemySprites.sprites[villains[i]];
+      if (esprites && esprites.idle) {
+        var cached = DuelEnemySprites.getCached(villains[i] + "_sel", esprites.idle, S, false);
+        ctx.drawImage(cached, cx + (cardW - cached.width) / 2, 105);
+      }
+
+      ctx.fillStyle = sel ? "#e8e6f0" : "#9a96b0"; ctx.font = "bold 14px monospace";
+      ctx.fillText(vDef.name, cx + cardW / 2, 220);
+      ctx.fillStyle = "#6a6a8a"; ctx.font = "10px monospace";
+      ctx.fillText(vDef.subtitle, cx + cardW / 2, 240);
+      ctx.fillStyle = "#c83030"; ctx.font = "9px monospace";
+      ctx.fillText("HP:" + vDef.hp + " ATK:" + vDef.atk + " DEF:" + vDef.def, cx + cardW / 2, 260);
+
+      if (sel) {
+        ctx.fillStyle = "#c83030";
+        ctx.fillRect(cx + cardW / 2 - 15, 275, 30, 4);
+      }
     }
-    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
-    ctx.fillText("Arrows: Select \u2022 Space: Fight \u2022 Shift: Back", CW / 2, CH - 8);
+
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
+    ctx.fillText("Arrow keys to choose \u2022 Space to fight \u2022 Shift: Back", CW / 2, CH - 8);
     ctx.textAlign = "left";
   }
 
