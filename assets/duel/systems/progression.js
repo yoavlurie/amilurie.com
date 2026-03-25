@@ -66,14 +66,6 @@ var DuelProgression = (function () {
     if (get().unlockedLocations.indexOf(id) >= 0) return true;
     var loc = (typeof DuelLocations !== "undefined") ? DuelLocations.get(id) : null;
     if (loc && loc.unlocked) return true;
-    if (loc && loc.requiresQuest) {
-      var qs = get().quests[loc.requiresQuest];
-      if (qs && qs.status === "completed") {
-        get().unlockedLocations.push(id);
-        save();
-        return true;
-      }
-    }
     return false;
   }
   function unlockLocation(id) { if (get().unlockedLocations.indexOf(id) < 0) { get().unlockedLocations.push(id); save(); } }
