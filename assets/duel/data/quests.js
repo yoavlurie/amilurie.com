@@ -70,14 +70,15 @@ var DuelQuests = (function () {
           chironBefore: "Kronos slows time itself. When he uses his time-slow power, dodge and wait — then rush in during the recharge!",
           chironAfter: "The Lord of Time falls! Olympus is saved!" }
       ],
-      rewards: { unlockLocation: "olympus", unlockVillain: "kronos", rewardChoice: true,
-        chironReward: "You've defeated a Titan Lord! Olympus itself is now accessible. Choose your reward wisely..." },
+      rewards: { unlockLocation: "olympus", unlockLocation2: "camp_jupiter", unlockLocation3: "house_of_life", unlockLocation4: "valhalla",
+        unlockVillain: "kronos", rewardChoice: true,
+        chironReward: "You've defeated a Titan Lord! Olympus is saved! But our fight is far from over. New threats are rising across the world — the Roman camp at Camp Jupiter needs help, Egyptian magicians stir in Brooklyn, and Norse warriors clash in Valhalla. I've unlocked all three realms for you. The world needs heroes everywhere. Choose your next adventure wisely!" },
       prereq: "quest_underworld_pass" },
 
     /* ---- HoO Story ---- */
     { id: "quest_roman_contact", name: "The Son of Neptune", type: "story", series: "hoo", locationId: "camp_jupiter",
       desc: "Journey to the Roman camp.",
-      chironIntro: "There are Roman demigods too — at Camp Jupiter. They need our help against the Giants.",
+      chironIntro: "Welcome to Camp Jupiter! The Roman demigods need our help against a new breed of enemies — the Giants, born to destroy the gods themselves.",
       steps: [
         { type: "defeat", target: "octavian", text: "Deal with Octavian",
           chironBefore: "Octavian is all talk — fragile once you close the distance.",
@@ -86,8 +87,8 @@ var DuelQuests = (function () {
           chironBefore: "The Snow Goddess fires ice blasts that slow you. Stay close where she's weakest!",
           chironAfter: "Camp Jupiter is safe!" }
       ],
-      rewards: { unlockLocation: "camp_jupiter", unlockHero: "jason", rewardChoice: true,
-        chironReward: "Jason Grace joins your ranks! The Roman and Greek camps are united." },
+      rewards: { unlockHero: "jason", unlockLocation: "san_francisco", rewardChoice: true,
+        chironReward: "Jason Grace joins your ranks! San Francisco awaits — the Giants are gathering on the West Coast." },
       prereq: "quest_titan_war" },
 
     /* ---- More quests follow same pattern ---- */

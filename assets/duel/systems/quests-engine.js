@@ -84,6 +84,9 @@ var DuelQuestEngine = (function () {
     if (r.unlockHero) DuelProgression.unlockHero(r.unlockHero);
     if (r.unlockHero2) DuelProgression.unlockHero(r.unlockHero2);
     if (r.unlockLocation) DuelProgression.unlockLocation(r.unlockLocation);
+    if (r.unlockLocation2) DuelProgression.unlockLocation(r.unlockLocation2);
+    if (r.unlockLocation3) DuelProgression.unlockLocation(r.unlockLocation3);
+    if (r.unlockLocation4) DuelProgression.unlockLocation(r.unlockLocation4);
     if (r.unlockVillain) DuelProgression.unlockVillain(r.unlockVillain);
   }
 
