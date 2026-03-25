@@ -37,30 +37,12 @@ var DuelProgression = (function () {
     try {
       var d = JSON.parse(localStorage.getItem(SAVE_KEY));
       if (d && d.version === 3) { data = d; return; }
-      /* Try v2 migration */
-      var v2 = JSON.parse(localStorage.getItem("amilurie_duel_v2"));
-      if (v2 && v2.version === 2) {
-        data = defaultData();
-        data.unlockedHeroes = v2.unlockedHeroes || ["percy", "annabeth"];
-        data.defeatedEnemies = v2.defeatedEnemies || {};
-        data.unlockedVillains = v2.unlockedVillains || [];
-        data.unlockedLocations = v2.unlockedLocations || ["camp_halfblood"];
-        data.quests = v2.quests || {};
-        data.completedBattles = v2.completedBattles || [];
-        data.introSeen = true;
-        save();
-        return;
-      }
-      /* Try v1 migration */
-      var v1 = JSON.parse(localStorage.getItem("amilurie_duel_progress"));
-      if (v1 && v1.unlocked) {
-        data = defaultData();
-        data.introSeen = true;
-        save();
-        return;
-      }
     } catch (e) { /* ignore */ }
+    /* Any old save (v1 or v2) gets a clean reset — old game was broken */
+    try { localStorage.removeItem("amilurie_duel_v2"); } catch (e) { /* ignore */ }
+    try { localStorage.removeItem("amilurie_duel_progress"); } catch (e) { /* ignore */ }
     data = defaultData();
+    save();
   }
 
   function save() {
