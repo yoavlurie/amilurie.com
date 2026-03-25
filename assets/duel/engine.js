@@ -41,12 +41,8 @@
     canvas.focus();
     canvas.addEventListener("click", function () { canvas.focus(); });
 
-    /* Start at intro or select based on save */
-    if (DuelProgression.get().introSeen) {
-      gameState = "SELECT";
-    } else {
-      gameState = "INTRO";
-    }
+    /* Always start at intro */
+    gameState = "INTRO";
 
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
@@ -75,6 +71,7 @@
       case "REWARD":       updateReward(); break;
       case "VILLAIN_SEL":  updateVillainSelect(); break;
       case "QUEST_LOG":    updateQuestLog(); break;
+      case "CONTINUE_NEW": updateContinueNew(); break;
     }
 
     render();
@@ -106,34 +103,123 @@
   }
 
   /* ================================================ PATH CHOICE (Hero vs Villain) ================================================ */
+  var continueNewChoice = 0; /* 0=continue, 1=new game */
+  var pendingPath = 0; /* 0=hero, 1=villain */
+
   function updatePathChoice() {
     if (DuelControls.isJustPressed("left") || DuelControls.isJustPressed("right")) {
       selectIndex = selectIndex === 0 ? 1 : 0;
     }
     if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
-      DuelProgression.get().introSeen = true;
-      DuelProgression.get().isVillainPath = selectIndex === 1;
-      DuelProgression.save();
-
-      if (selectIndex === 0) {
-        /* Hero path */
-        showDialogue("Chiron", "Welcome, young demigod! I am Chiron, trainer of heroes. I will guide you on your journey. First, choose your champion!", "#d4a017", function () {
-          gameState = "SELECT";
-        });
+      pendingPath = selectIndex;
+      /* Check if there's existing progress for this path */
+      var hasProgress = DuelProgression.get().introSeen && Object.keys(DuelProgression.get().defeatedEnemies).length > 0;
+      if (hasProgress) {
+        continueNewChoice = 0;
+        gameState = "CONTINUE_NEW";
       } else {
-        /* Villain path — start with Alecto and Minotaur as playable */
-        DuelProgression.get().unlockedVillains = ["alecto", "minotaur"];
-        DuelProgression.get().currentLocation = "tartarus";
-        DuelProgression.unlockLocation("tartarus");
-        DuelProgression.unlockLocation("underworld");
+        startPath(true);
+      }
+    }
+  }
+
+  function startPath(isNew) {
+    if (isNew) {
+      DuelProgression.resetSave();
+    }
+    DuelProgression.get().introSeen = true;
+    DuelProgression.get().isVillainPath = pendingPath === 1;
+    DuelProgression.save();
+
+    if (pendingPath === 0) {
+      showDialogue("Chiron", "Welcome, young demigod! I am Chiron, trainer of heroes. I will guide you on your journey. First, choose your champion!", "#d4a017", function () {
+        gameState = "SELECT";
+      });
+    } else {
+      DuelProgression.get().unlockedVillains = DuelProgression.get().unlockedVillains.length > 0
+        ? DuelProgression.get().unlockedVillains : ["alecto", "minotaur"];
+      DuelProgression.get().currentLocation = "tartarus";
+      DuelProgression.unlockLocation("tartarus");
+      DuelProgression.unlockLocation("underworld");
+      DuelProgression.save();
+      showDialogue("Tartarus", "Welcome, creature of darkness... I am Tartarus, the Pit itself. You shall be my champion. Choose your form and rise to destroy the heroes above!", "#c83030", function () {
+        isVillainMode = true;
+        villainSelectIndex = 0;
+        gameState = "VILLAIN_SEL";
+      });
+    }
+  }
+
+  /* ================================================ CONTINUE OR NEW GAME ================================================ */
+  function updateContinueNew() {
+    if (DuelControls.isJustPressed("left") || DuelControls.isJustPressed("right")) {
+      continueNewChoice = continueNewChoice === 0 ? 1 : 0;
+    }
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      if (continueNewChoice === 0) {
+        /* Continue */
+        DuelProgression.get().isVillainPath = pendingPath === 1;
         DuelProgression.save();
-        showDialogue("Tartarus", "Welcome, creature of darkness... I am Tartarus, the Pit itself. You shall be my champion. Choose your form — Alecto the Fury, or the mighty Minotaur — and rise to destroy the heroes above!", "#c83030", function () {
+        if (pendingPath === 0) {
+          gameState = "SELECT";
+        } else {
           isVillainMode = true;
           villainSelectIndex = 0;
           gameState = "VILLAIN_SEL";
-        });
+        }
+      } else {
+        /* New game */
+        startPath(true);
       }
     }
+  }
+
+  function renderContinueNew() {
+    ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
+    ctx.textAlign = "center";
+
+    /* Show speaker sprite */
+    var spriteKey = pendingPath === 1 ? "tartarus" : "chiron";
+    var esprites = DuelEnemySprites.sprites[spriteKey];
+    if (esprites && esprites.idle) {
+      var cached = DuelEnemySprites.getCached(spriteKey + "_cont", esprites.idle, S, false);
+      ctx.drawImage(cached, CW / 2 - cached.width / 2, 20);
+    }
+
+    var color = pendingPath === 1 ? "#c83030" : "#d4a017";
+    ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 20px monospace";
+    ctx.fillText("You have a saved game!", CW / 2, 140);
+
+    var defeated = Object.keys(DuelProgression.get().defeatedEnemies).length;
+    var heroes = DuelProgression.get().unlockedHeroes.length;
+    ctx.fillStyle = "#9a96b0"; ctx.font = "12px monospace";
+    ctx.fillText(defeated + " enemies defeated \u2022 " + heroes + " heroes unlocked", CW / 2, 170);
+
+    /* Continue card */
+    var cSel = continueNewChoice === 0;
+    ctx.fillStyle = cSel ? "#1a2a1a" : "#12111f";
+    ctx.strokeStyle = cSel ? color : "#2a2845";
+    ctx.lineWidth = cSel ? 3 : 1;
+    DuelUtils.roundRect(ctx, 100, 200, 220, 80, 10);
+    ctx.fillStyle = cSel ? "#e8e6f0" : "#6a6a8a"; ctx.font = "bold 16px monospace";
+    ctx.fillText("Continue", 210, 240);
+    ctx.fillStyle = "#9a96b0"; ctx.font = "10px monospace";
+    ctx.fillText("Pick up where you left off", 210, 260);
+
+    /* New game card */
+    var nSel = continueNewChoice === 1;
+    ctx.fillStyle = nSel ? "#2a1a1a" : "#12111f";
+    ctx.strokeStyle = nSel ? "#c83030" : "#2a2845";
+    ctx.lineWidth = nSel ? 3 : 1;
+    DuelUtils.roundRect(ctx, 400, 200, 220, 80, 10);
+    ctx.fillStyle = nSel ? "#e8e6f0" : "#6a6a8a"; ctx.font = "bold 16px monospace";
+    ctx.fillText("New Game", 510, 240);
+    ctx.fillStyle = "#9a96b0"; ctx.font = "10px monospace";
+    ctx.fillText("Start fresh from the beginning", 510, 260);
+
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
+    ctx.fillText("Arrow keys to choose \u2022 Space to confirm", CW / 2, 340);
+    ctx.textAlign = "left";
   }
 
   function renderPathChoice() {
@@ -1004,6 +1090,7 @@
       case "REWARD":       renderReward(); break;
       case "VILLAIN_SEL":  renderVillainSelect(); break;
       case "QUEST_LOG":    renderQuestLog(); break;
+      case "CONTINUE_NEW": renderContinueNew(); break;
     }
   }
 
