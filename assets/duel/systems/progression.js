@@ -6,7 +6,7 @@
 var DuelProgression = (function () {
   "use strict";
 
-  var SAVE_KEY = "amilurie_duel_v3";
+  var SAVE_KEY = "amilurie_duel_v4";
   var data = null;
 
   /* ---- Magic item definitions ---- */
@@ -18,7 +18,7 @@ var DuelProgression = (function () {
 
   function defaultData() {
     return {
-      version: 3,
+      version: 4,
       selectedHero: "percy",
       unlockedHeroes: ["percy", "annabeth"],
       currentLocation: "camp_halfblood",
@@ -36,9 +36,10 @@ var DuelProgression = (function () {
   function load() {
     try {
       var d = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (d && d.version === 3) { data = d; return; }
+      if (d && d.version === 4) { data = d; return; }
     } catch (e) { /* ignore */ }
-    /* Any old save (v1 or v2) gets a clean reset — old game was broken */
+    /* Wipe ALL old saves */
+    try { localStorage.removeItem("amilurie_duel_v3"); } catch (e) { /* ignore */ }
     try { localStorage.removeItem("amilurie_duel_v2"); } catch (e) { /* ignore */ }
     try { localStorage.removeItem("amilurie_duel_progress"); } catch (e) { /* ignore */ }
     data = defaultData();
