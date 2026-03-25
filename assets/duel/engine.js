@@ -428,7 +428,7 @@
   }
 
   function checkPlayerAttackHit() {
-    if (player.state !== "attack" || player.stateTimer <= 0.05 || player.stateTimer >= 0.2) return;
+    if (player.state !== "attack" || player.stateTimer <= 0.03 || player.stateTimer >= 0.32) return;
     var hb = DuelCombat.getAttackHitbox(player);
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
@@ -439,7 +439,7 @@
       if (DuelUtils.rectsOverlap(hb, eb)) {
         var mult = e.isShadow ? 0.2 : 1.0;
         mult *= DuelStatus.getAtkMult(player);
-        var dmg = Math.max(1, Math.round(player.atk * mult - e.def * 0.3 + GameUtils.randomInt(-1, 2)));
+        var dmg = Math.max(2, Math.round(player.atk * mult * 1.3 - e.def * 0.2 + GameUtils.randomInt(0, 3)));
         DuelCombat.applyDamage(e, dmg, player.x > e.x, false);
       }
     }
@@ -453,14 +453,14 @@
       if (DuelUtils.rectsOverlap(hb, pb)) {
         /* Check player dodge */
         if (DuelStatus.getDodgeChance(player) > 0 && Math.random() < DuelStatus.getDodgeChance(player)) return;
-        var dmg = Math.max(1, Math.round(enemy.atk * DuelStatus.getAtkMult(enemy) - player.def * 0.3 + GameUtils.randomInt(-1, 2)));
+        var dmg = Math.max(1, Math.round(enemy.atk * DuelStatus.getAtkMult(enemy) * 0.7 - player.def * 0.5 + GameUtils.randomInt(-1, 1)));
         DuelCombat.applyDamage(player, dmg, enemy.x > player.x, player.state === "block");
       }
     }
     if (action === "charge_hit") {
       var chb = { x: enemy.x - 10, y: enemy.y, w: enemy.w * S + 20, h: enemy.h * S };
       if (DuelUtils.rectsOverlap(chb, DuelCombat.getEntityBox(player))) {
-        var cdmg = Math.max(1, Math.round(enemy.atk * 1.3 + GameUtils.randomInt(0, 3)));
+        var cdmg = Math.max(1, Math.round(enemy.atk * 0.9 - player.def * 0.4 + GameUtils.randomInt(0, 2)));
         DuelCombat.applyDamage(player, cdmg, enemy.x > player.x, player.state === "block");
       }
     }
@@ -765,6 +765,15 @@
       ctx.fillText("WASD:Move  S:Duck  Space:Attack  Shift:Block  E:Special  Q:Flee", CW / 2, CH - 22);
       ctx.globalAlpha = 1;
     }
+
+    /* Combat tips based on situation */
+    var tip = getCombatTip(enemies[0]);
+    if (tip) {
+      ctx.fillStyle = "#8b7fd4"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(tip, CW / 2, 54);
+      ctx.globalAlpha = 1;
+    }
     ctx.textAlign = "left";
   }
 
@@ -774,6 +783,20 @@
     ctx.fillStyle = "#d4a017"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center";
     ctx.fillText("Wave " + (DuelWaves.getCurrentWave() + 1) + "/" + DuelWaves.getTotalWaves(), CW / 2, 16);
     ctx.textAlign = "left";
+  }
+
+  function getCombatTip(enemy) {
+    if (!enemy || !player) return null;
+    /* Show tips based on what's happening */
+    if (player.hp < player.maxHp * 0.25) return "Low HP! Use Block (Shift) or Flee (Q at arena edge)";
+    if (enemy.showTelegraph) return "Watch out! Enemy is about to attack — dodge or block!";
+    if (enemy.aiState === "stunned") return "Enemy is stunned — attack now!";
+    if (enemy.aiState === "retreat") return "Enemy retreating — chase and attack!";
+    if (enemy.isShadow) return "Enemy is in shadow form — wait for it to attack";
+    if (player.specialCharges > 0 && player.specialCooldown <= 0 && enemy.hp < enemy.maxHp * 0.4) return "Enemy is weak — use your Special (E) to finish it!";
+    if (enemy.aiState === "cast_special") return "Enemy is casting — rush in and interrupt!";
+    if (enemy.aiType === "charger" && enemy.aiState === "charge") return "Dodge the charge! It'll be stunned if it hits a wall";
+    return null;
   }
 
   function drawBar(x, y, w, h, val, max, color) {

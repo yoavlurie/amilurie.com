@@ -13,9 +13,9 @@ var DuelUtils = (function () {
   var CH = 400;
   var GRAVITY = 900;
   var JUMP_VEL = -380;
-  var ATTACK_DURATION = 0.25;
-  var ATTACK_COOLDOWN = 0.45;
-  var BLOCK_REDUCTION = 0.2;
+  var ATTACK_DURATION = 0.35;
+  var ATTACK_COOLDOWN = 0.3;
+  var BLOCK_REDUCTION = 0.15;
   var DUCK_HITBOX_MULT = 0.6;
 
   function lerp(a, b, t) { return a + (b - a) * t; }
