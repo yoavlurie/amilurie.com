@@ -58,6 +58,9 @@
     lastTime = ts;
     DuelControls.updateFrame();
 
+    /* Global mute toggle */
+    if (DuelControls.isJustPressed("mute")) DuelMusic.toggleMute();
+
     switch (gameState) {
       case "INTRO":        updateIntro(); break;
       case "PATH_CHOICE":  updatePathChoice(); break;
@@ -81,6 +84,8 @@
   /* ================================================ INTRO ================================================ */
   function updateIntro() {
     if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      DuelMusic.init();
+      DuelMusic.playMenu();
       gameState = "PATH_CHOICE";
     }
   }
@@ -478,6 +483,10 @@
     controlsHintTimer = 5;
     currentBattleId = null;
     gameState = "PLAYING";
+    /* Music: boss theme for tier 4-5, villain theme if villain mode, else combat */
+    if (isVillainMode) { DuelMusic.playVillain(); }
+    else if (enemyDef.tier >= 4) { DuelMusic.playBoss(); }
+    else { DuelMusic.playCombat(); }
   }
 
   /* ================================================ PLAYING ================================================ */
@@ -529,8 +538,9 @@
       DuelQuestEngine.onEvent("enemy_defeated", { enemyId: currentEnemyId });
       DuelQuestEngine.autoStartAvailable();
       gameState = "VICTORY";
+      DuelMusic.playVictory();
     }
-    if (player.hp <= 0) gameState = "DEFEAT";
+    if (player.hp <= 0) { gameState = "DEFEAT"; DuelMusic.playDefeat(); }
   }
 
   /* ================================================ BATTLE ================================================ */
@@ -727,6 +737,7 @@
       if (!showedDialogue) {
         isVillainMode = false;
         gameState = "LOCATION";
+        DuelMusic.playMenu();
       }
     }
   }

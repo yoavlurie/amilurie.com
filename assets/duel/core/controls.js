@@ -22,7 +22,8 @@ var DuelControls = (function () {
     confirm: [" ", "Enter"],
     pause:   ["Escape", "p", "P"],
     flee:    ["q", "Q"],
-    questlog:["Tab"]
+    questlog:["Tab"],
+    mute:    ["m", "M"]
   };
 
   function isAction(action) {
