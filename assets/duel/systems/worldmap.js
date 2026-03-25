@@ -35,22 +35,30 @@ var DuelWorldMap = (function () {
     var connected = getConnectedNodes(selectedNode);
     if (connected.length === 0) return;
 
-    var best = null, bestDist = Infinity;
+    /* Use angle-based matching: each direction covers a 90-degree cone.
+       right = -45 to +45 degrees, up = -135 to -45, left = 135 to -135, down = 45 to 135 */
+    var best = null, bestScore = -Infinity;
     for (var i = 0; i < connected.length; i++) {
       var target = DuelLocations.get(connected[i]);
       if (!target) continue;
       var dx = target.x - current.x;
       var dy = target.y - current.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 5) continue;
 
-      var match = false;
-      if (direction === "left" && dx < -10) match = true;
-      if (direction === "right" && dx > 10) match = true;
-      if (direction === "up" && dy < -10) match = true;
-      if (direction === "down" && dy > 10) match = true;
+      /* Calculate how well this node matches the direction (dot product with unit direction) */
+      var dirX = 0, dirY = 0;
+      if (direction === "right") dirX = 1;
+      else if (direction === "left") dirX = -1;
+      else if (direction === "up") dirY = -1;
+      else if (direction === "down") dirY = 1;
 
-      if (match) {
-        var dist = Math.abs(dx) + Math.abs(dy);
-        if (dist < bestDist) { bestDist = dist; best = connected[i]; }
+      var dot = (dx / dist) * dirX + (dy / dist) * dirY;
+      /* Only consider nodes that are at least somewhat in the right direction (dot > 0.2) */
+      if (dot > 0.2) {
+        /* Score: higher dot product (better direction match) wins, with slight preference for closer nodes */
+        var score = dot - dist / 2000;
+        if (score > bestScore) { bestScore = score; best = connected[i]; }
       }
     }
     if (best) selectedNode = best;
