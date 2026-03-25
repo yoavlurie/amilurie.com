@@ -233,9 +233,20 @@
       }
     }
 
+    /* Check if all enemies here are beaten — show guidance */
+    var allBeaten = locEnemies.length > 0;
+    for (var ab = 0; ab < locEnemies.length; ab++) {
+      if (!DuelProgression.isEnemyDefeated(locEnemies[ab].id)) { allBeaten = false; break; }
+    }
+    if (allBeaten && locEnemies.length > 0) {
+      ctx.fillStyle = "#8b7fd4"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+      ctx.fillText("All enemies defeated here! Press Shift to go back to the World Map", CW / 2, CH - 28);
+      ctx.fillText("and explore newly unlocked locations.", CW / 2, CH - 16);
+    }
+
     ctx.textAlign = "center";
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
-    ctx.fillText("Arrows: Select \u2022 Space: Fight/Start \u2022 Shift: Back", CW / 2, CH - 8);
+    ctx.fillText("Arrows: Select \u2022 Space: Fight/Start \u2022 Shift: Back to Map", CW / 2, CH - 4);
     ctx.textAlign = "left";
   }
 
@@ -600,16 +611,38 @@
   }
 
   /* ================================================ RESULT ================================================ */
+  var resultRewards = null;
+
   function updateResult() {
     if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
       DuelWaves.clear();
       isVillainMode = false;
-      if (gameState === "VICTORY") {
-        gameState = "LOCATION";
-      } else {
-        gameState = "LOCATION";
+      resultRewards = null;
+      gameState = "MAP";
+    }
+  }
+
+  function checkNewRewards() {
+    /* Check what was just unlocked so we can show it */
+    var rewards = [];
+    var log = DuelQuestEngine.getQuestLog();
+    for (var i = 0; i < log.length; i++) {
+      if (log[i].status === "completed") {
+        var r = log[i].quest.rewards;
+        if (r) {
+          if (r.unlockLocation) {
+            var loc = DuelLocations.get(r.unlockLocation);
+            if (loc) rewards.push("New location: " + loc.name);
+          }
+          if (r.unlockHero) {
+            var h = DuelHeroDefs.getById(r.unlockHero);
+            if (h) rewards.push("New hero: " + h.name);
+          }
+          if (r.unlockVillain) rewards.push("Villain mode unlocked: " + r.unlockVillain);
+        }
       }
     }
+    return rewards;
   }
 
   function renderResult(victory) {
@@ -620,18 +653,33 @@
 
     if (victory) {
       ctx.fillStyle = "#2d8a4e"; ctx.font = "bold 36px monospace";
-      ctx.fillText("VICTORY!", CW / 2, 140);
+      ctx.fillText("VICTORY!", CW / 2, 120);
       ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
-      ctx.fillText((enemies[0] ? enemies[0].name : "Enemy") + " defeated!", CW / 2, 180);
+      ctx.fillText((enemies[0] ? enemies[0].name : "Enemy") + " defeated!", CW / 2, 155);
+
+      /* Show rewards */
+      if (!resultRewards) resultRewards = checkNewRewards();
+      if (resultRewards.length > 0) {
+        ctx.fillStyle = "#d4a017"; ctx.font = "bold 12px monospace";
+        for (var i = 0; i < resultRewards.length; i++) {
+          ctx.fillText(resultRewards[i], CW / 2, 190 + i * 20);
+        }
+      }
+
+      /* Tell the player what to do next */
+      ctx.fillStyle = "#8b7fd4"; ctx.font = "11px monospace";
+      ctx.fillText("Return to the World Map to explore new locations!", CW / 2, 250);
     } else {
       ctx.fillStyle = "#c93030"; ctx.font = "bold 36px monospace";
-      ctx.fillText("DEFEATED", CW / 2, 140);
+      ctx.fillText("DEFEATED", CW / 2, 120);
       ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
-      ctx.fillText("But legends never truly die.", CW / 2, 180);
+      ctx.fillText("But legends never truly die.", CW / 2, 160);
+      ctx.fillStyle = "#8b7fd4"; ctx.font = "11px monospace";
+      ctx.fillText("Try again — use Block (Shift) and dodge enemy attacks!", CW / 2, 200);
     }
 
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
-    ctx.fillText("Press Space to continue", CW / 2, 280);
+    ctx.fillText("Press Space to continue", CW / 2, 300);
     ctx.textAlign = "left";
   }
 

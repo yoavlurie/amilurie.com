@@ -53,8 +53,23 @@ var DuelProgression = (function () {
   function isHeroUnlocked(id) { return get().unlockedHeroes.indexOf(id) >= 0; }
   function unlockHero(id) { if (!isHeroUnlocked(id)) { get().unlockedHeroes.push(id); save(); } }
 
-  function isLocationUnlocked(id) { return get().unlockedLocations.indexOf(id) >= 0; }
-  function unlockLocation(id) { if (!isLocationUnlocked(id)) { get().unlockedLocations.push(id); save(); } }
+  function isLocationUnlocked(id) {
+    if (get().unlockedLocations.indexOf(id) >= 0) return true;
+    /* Also check if the location's requiresQuest is completed */
+    var loc = DuelLocations ? DuelLocations.get(id) : null;
+    if (loc && loc.unlocked) return true;
+    if (loc && loc.requiresQuest) {
+      var qs = get().quests[loc.requiresQuest];
+      if (qs && qs.status === "completed") {
+        /* Auto-add to unlocked list */
+        get().unlockedLocations.push(id);
+        save();
+        return true;
+      }
+    }
+    return false;
+  }
+  function unlockLocation(id) { if (get().unlockedLocations.indexOf(id) < 0) { get().unlockedLocations.push(id); save(); } }
 
   function isEnemyDefeated(id) { return !!get().defeatedEnemies[id]; }
   function recordDefeat(id) {
