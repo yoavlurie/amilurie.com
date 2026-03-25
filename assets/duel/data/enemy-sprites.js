@@ -293,6 +293,63 @@ var DuelEnemySprites = (function () {
     "..oox...xxoo....","..ooo...oooo....","................","................"
   ], mp) };
 
+  /* ---- NPC sprites (Chiron, Tartarus) ---- */
+  /* Chiron — centaur: human torso on horse body, brown hair, wise face */
+  monsters.chiron = { idle: pf([
+    "....obbbbbo.....",
+    "...obbbbbbbbo...",
+    "...obbbbbbbbo...",
+    "...osssssssso...",
+    "...osWsssWsso...",
+    "...ossssssss....",
+    "....osssssso....",
+    ".....ossso......",
+    "....obbbbbbo....",
+    "...obbbbbbbb....",
+    "..obbBBBBBBBbo..",
+    ".obBBBBBBBBBBBo.",
+    ".oBBBBBBBBBBBBo.",
+    ".oBBBBBBBBBBBBo.",
+    ".oBBBBBBBBBBBBo.",
+    "..oBBBBBBBBBBo..",
+    "..ob.oBBBo.bo...",
+    "..ob.oBBBo.bo...",
+    "..ob..oBo..bo...",
+    "..oo..ooo..oo...",
+    "................",
+    "................",
+    "................",
+    "................"
+  ], mp) };
+
+  /* Tartarus — primordial darkness, swirling void with glowing eyes */
+  monsters.tartarus = { idle: pf([
+    "..KKKKKKKKKKKK..",
+    ".KKKKKKKKKKKKKK.",
+    "KKKKKKKKKKKKKKK.",
+    "KKKKKdKKKKdKKKK",
+    "KKKKddKKKKddKKK",
+    "KKKKKKKKKKKKKKK.",
+    ".KKKKKKRRKKKKK..",
+    "..KKKKKKKKKKK...",
+    "...KKKKKKKKKK...",
+    "..KKKKKKKKKKKKK.",
+    ".KKKKKKKKKKKKKK.",
+    "KKKKPKKKKKPKKKK",
+    "KKKKKKKKKKKKKKK.",
+    "KKKKKKKKKKKKKK..",
+    "..KKKKKKKKKKK...",
+    "...KKKKKKKKK....",
+    "....KKKKKKK.....",
+    "...KKKKKKKKKK...",
+    "..KKKKKKKKKKK...",
+    ".KKKKKKKKKKKK...",
+    "KKKKKKKKKKKKKK..",
+    "..KKKKKKKKKKK...",
+    "....KKKKKKK.....",
+    "................"
+  ], mp) };
+
   /* Compile all sprites */
   var sprites = {};
   var hkeys = Object.keys(humanoids);

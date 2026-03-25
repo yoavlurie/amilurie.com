@@ -199,20 +199,36 @@
   function renderDialogue() {
     ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
 
+    /* Speaker sprite */
+    var spriteKey = dialogueSpeaker === "Tartarus" ? "tartarus" : "chiron";
+    var esprites = DuelEnemySprites.sprites[spriteKey];
+    if (esprites && esprites.idle) {
+      var cached = DuelEnemySprites.getCached(spriteKey + "_dlg", esprites.idle, S, false);
+      ctx.drawImage(cached, 40, 30);
+    }
+
     /* Speaker name */
-    ctx.fillStyle = dialogueColor; ctx.font = "bold 18px monospace"; ctx.textAlign = "center";
-    ctx.fillText(dialogueSpeaker, CW / 2, 60);
+    ctx.fillStyle = dialogueColor; ctx.font = "bold 18px monospace"; ctx.textAlign = "left";
+    ctx.fillText(dialogueSpeaker, 120, 55);
+
+    /* Speaker title */
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "10px monospace";
+    if (dialogueSpeaker === "Chiron") {
+      ctx.fillText("Trainer of Heroes", 120, 72);
+    } else if (dialogueSpeaker === "Tartarus") {
+      ctx.fillText("The Primordial Pit", 120, 72);
+    }
 
     /* Text box */
     ctx.fillStyle = "#1a1930"; ctx.strokeStyle = dialogueColor; ctx.lineWidth = 2;
-    DuelUtils.roundRect(ctx, 40, 80, CW - 80, 200, 10);
+    DuelUtils.roundRect(ctx, 40, 130, CW - 80, 170, 10);
 
     /* Wrap dialogue text */
     ctx.fillStyle = "#e8e6f0"; ctx.font = "13px monospace"; ctx.textAlign = "left";
-    wrapText(ctx, dialogueText, 60, 110, CW - 120, 20);
+    wrapText(ctx, dialogueText, 60, 160, CW - 120, 20);
 
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
-    ctx.fillText("Press Space to continue", CW / 2, 340);
+    ctx.fillText("Press Space to continue", CW / 2, 350);
     ctx.textAlign = "left";
   }
 
