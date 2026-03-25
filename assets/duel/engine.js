@@ -1,6 +1,7 @@
 /* ============================================
    Mythic Duel — Game Engine
-   Game loop, state machine, rendering, all screens
+   Game loop, state machine, Chiron/Tartarus dialogue,
+   magic items, reward choices, villain path
    ============================================ */
 
 (function () {
@@ -10,14 +11,24 @@
   var CW = DuelUtils.CW, CH = DuelUtils.CH;
   var S = DuelUtils.SCALE;
 
-  var gameState = "SELECT";
+  var gameState = "INTRO";
   var lastTime = 0;
   var player = null, enemies = [], arena = null;
   var selectedHero = "percy", currentEnemyId = null, currentBattleId = null;
   var selectIndex = 0, locationMenuIndex = 0, villainSelectIndex = 0;
   var controlsHintTimer = 5;
   var isVillainMode = false;
-  var questLogOpen = false;
+
+  /* Dialogue state */
+  var dialogueText = "";
+  var dialogueSpeaker = "Chiron";
+  var dialogueCallback = null;
+  var dialogueColor = "#d4a017";
+
+  /* Reward choice state */
+  var rewardChoices = [];
+  var rewardChoiceIndex = 0;
+  var currentQuestRewards = null;
 
   /* ================================================ INIT ================================================ */
   document.addEventListener("DOMContentLoaded", function () {
@@ -29,6 +40,14 @@
     DuelQuestEngine.autoStartAvailable();
     canvas.focus();
     canvas.addEventListener("click", function () { canvas.focus(); });
+
+    /* Start at intro or select based on save */
+    if (DuelProgression.get().introSeen) {
+      gameState = "SELECT";
+    } else {
+      gameState = "INTRO";
+    }
+
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
   });
@@ -40,28 +59,155 @@
     DuelControls.updateFrame();
 
     switch (gameState) {
-      case "SELECT":       updateSelect(dt); break;
-      case "MAP":          updateMap(dt); break;
-      case "LOCATION":     updateLocation(dt); break;
+      case "INTRO":        updateIntro(); break;
+      case "PATH_CHOICE":  updatePathChoice(); break;
+      case "SELECT":       updateSelect(); break;
+      case "MAP":          updateMap(); break;
+      case "LOCATION":     updateLocation(); break;
+      case "DIALOGUE":     updateDialogue(); break;
       case "PLAYING":      updatePlaying(dt); break;
       case "BATTLE":       updateBattle(dt); break;
-      case "VICTORY":      updateResult(dt); break;
-      case "DEFEAT":       updateResult(dt); break;
-      case "VILLAIN_SEL":  updateVillainSelect(dt); break;
-      case "QUEST_LOG":    updateQuestLog(dt); break;
+      case "VICTORY":      updateVictory(); break;
+      case "DEFEAT":       updateDefeat(); break;
+      case "REWARD":       updateReward(); break;
+      case "VILLAIN_SEL":  updateVillainSelect(); break;
+      case "QUEST_LOG":    updateQuestLog(); break;
     }
 
     render();
     requestAnimationFrame(gameLoop);
   }
 
+  /* ================================================ INTRO ================================================ */
+  function updateIntro() {
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      gameState = "PATH_CHOICE";
+    }
+  }
+
+  function renderIntro() {
+    ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
+    ctx.textAlign = "center";
+
+    ctx.fillStyle = "#d4a017"; ctx.font = "bold 28px monospace";
+    ctx.fillText("Mythic Duel", CW / 2, 80);
+    ctx.fillStyle = "#e8e6f0"; ctx.font = "16px monospace";
+    ctx.fillText("A world of gods, monsters, and heroes", CW / 2, 120);
+    ctx.fillText("awaits your choice...", CW / 2, 145);
+
+    ctx.fillStyle = "#9a96b0"; ctx.font = "12px monospace";
+    ctx.fillText("Press Space to begin", CW / 2, 300);
+    ctx.textAlign = "left";
+  }
+
+  /* ================================================ PATH CHOICE (Hero vs Villain) ================================================ */
+  function updatePathChoice() {
+    if (DuelControls.isJustPressed("left") || DuelControls.isJustPressed("right")) {
+      selectIndex = selectIndex === 0 ? 1 : 0;
+    }
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      DuelProgression.get().introSeen = true;
+      DuelProgression.get().isVillainPath = selectIndex === 1;
+      DuelProgression.save();
+
+      if (selectIndex === 0) {
+        /* Hero path */
+        showDialogue("Chiron", "Welcome, young demigod! I am Chiron, trainer of heroes. I will guide you on your journey. First, choose your champion!", "#d4a017", function () {
+          gameState = "SELECT";
+        });
+      } else {
+        /* Villain path */
+        showDialogue("Tartarus", "Welcome, creature of darkness... I am Tartarus, the Pit itself. You shall be my champion. Rise from the abyss and destroy the heroes above!", "#c83030", function () {
+          isVillainMode = true;
+          gameState = "VILLAIN_SEL";
+        });
+      }
+    }
+  }
+
+  function renderPathChoice() {
+    ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 22px monospace";
+    ctx.fillText("Choose Your Path", CW / 2, 60);
+
+    /* Hero card */
+    var heroSel = selectIndex === 0;
+    ctx.fillStyle = heroSel ? "#1a2a1a" : "#12111f";
+    ctx.strokeStyle = heroSel ? "#d4a017" : "#2a2845";
+    ctx.lineWidth = heroSel ? 3 : 1;
+    DuelUtils.roundRect(ctx, 60, 100, 280, 200, 10);
+    ctx.fillStyle = heroSel ? "#d4a017" : "#9a96b0"; ctx.font = "bold 20px monospace";
+    ctx.fillText("HERO", 200, 150);
+    ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
+    ctx.fillText("Guided by Chiron", 200, 180);
+    ctx.fillText("Start at Camp Half-Blood", 200, 200);
+    ctx.fillText("Play as Percy or Annabeth", 200, 220);
+    ctx.fillText("Save the world from monsters", 200, 240);
+
+    /* Villain card */
+    var villSel = selectIndex === 1;
+    ctx.fillStyle = villSel ? "#2a1a1a" : "#12111f";
+    ctx.strokeStyle = villSel ? "#c83030" : "#2a2845";
+    ctx.lineWidth = villSel ? 3 : 1;
+    DuelUtils.roundRect(ctx, 380, 100, 280, 200, 10);
+    ctx.fillStyle = villSel ? "#c83030" : "#9a96b0"; ctx.font = "bold 20px monospace";
+    ctx.fillText("VILLAIN", 520, 150);
+    ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
+    ctx.fillText("Guided by Tartarus", 520, 180);
+    ctx.fillText("Start in the Abyss", 520, 200);
+    ctx.fillText("Play as Alecto or Minotaur", 520, 220);
+    ctx.fillText("Destroy the heroes", 520, 240);
+
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
+    ctx.fillText("Arrow keys to choose \u2022 Space to confirm", CW / 2, 350);
+    ctx.textAlign = "left";
+  }
+
+  /* ================================================ DIALOGUE ================================================ */
+  function showDialogue(speaker, text, color, callback) {
+    dialogueSpeaker = speaker;
+    dialogueText = text;
+    dialogueColor = color || "#d4a017";
+    dialogueCallback = callback;
+    gameState = "DIALOGUE";
+  }
+
+  function updateDialogue() {
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      if (dialogueCallback) {
+        var cb = dialogueCallback;
+        dialogueCallback = null;
+        cb();
+      } else {
+        gameState = "MAP";
+      }
+    }
+  }
+
+  function renderDialogue() {
+    ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
+
+    /* Speaker name */
+    ctx.fillStyle = dialogueColor; ctx.font = "bold 18px monospace"; ctx.textAlign = "center";
+    ctx.fillText(dialogueSpeaker, CW / 2, 60);
+
+    /* Text box */
+    ctx.fillStyle = "#1a1930"; ctx.strokeStyle = dialogueColor; ctx.lineWidth = 2;
+    DuelUtils.roundRect(ctx, 40, 80, CW - 80, 200, 10);
+
+    /* Wrap dialogue text */
+    ctx.fillStyle = "#e8e6f0"; ctx.font = "13px monospace"; ctx.textAlign = "left";
+    wrapText(ctx, dialogueText, 60, 110, CW - 120, 20);
+
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
+    ctx.fillText("Press Space to continue", CW / 2, 340);
+    ctx.textAlign = "left";
+  }
+
   /* ================================================ SELECT HERO ================================================ */
   function updateSelect() {
     var heroes = DuelHeroDefs.roster;
-    var unlocked = [];
-    for (var i = 0; i < heroes.length; i++) {
-      if (DuelProgression.isHeroUnlocked(heroes[i].id)) unlocked.push(i);
-    }
     if (DuelControls.isJustPressed("right")) selectIndex = (selectIndex + 1) % heroes.length;
     if (DuelControls.isJustPressed("left")) selectIndex = (selectIndex + heroes.length - 1) % heroes.length;
     if ((DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) &&
@@ -72,13 +218,18 @@
       isVillainMode = false;
       gameState = "MAP";
       DuelWorldMap.setSelected(DuelProgression.get().currentLocation);
+      DuelQuestEngine.autoStartAvailable();
+    }
+    /* V for villain mode */
+    if (DuelControls.isJustPressed("flee") && DuelProgression.get().unlockedVillains.length > 0) {
+      gameState = "VILLAIN_SEL"; villainSelectIndex = 0;
     }
   }
 
   function renderSelect() {
     ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
-    ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 24px monospace"; ctx.textAlign = "center";
-    ctx.fillText("Choose Your Hero", CW / 2, 30);
+    ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 22px monospace"; ctx.textAlign = "center";
+    ctx.fillText("Choose Your Hero", CW / 2, 28);
 
     var heroes = DuelHeroDefs.roster;
     var cols = 5, cellW = 130, cellH = 55, gap = 8;
@@ -88,7 +239,7 @@
     for (var i = 0; i < heroes.length; i++) {
       var h = heroes[i];
       var col = i % cols, row = Math.floor(i / cols);
-      var cx = startX + col * (cellW + gap), cy = 45 + row * (cellH + gap);
+      var cx = startX + col * (cellW + gap), cy = 42 + row * (cellH + gap);
       var unlocked = DuelProgression.isHeroUnlocked(h.id);
       var sel = i === selectIndex;
 
@@ -115,23 +266,28 @@
       }
     }
 
-    /* Villain mode button */
+    /* Magic items display */
+    var items = DuelProgression.get().magicItems;
+    if (items.length > 0) {
+      ctx.fillStyle = "#d4a017"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left";
+      ctx.fillText("Magic Items:", 10, CH - 60);
+      for (var m = 0; m < items.length; m++) {
+        var mi = DuelProgression.MAGIC_ITEMS[items[m]];
+        if (mi) { ctx.fillStyle = mi.color; ctx.font = "9px monospace"; ctx.fillText(mi.name, 10, CH - 45 + m * 12); }
+      }
+    }
+
     var villains = DuelProgression.get().unlockedVillains;
     if (villains.length > 0) {
       ctx.fillStyle = "#1a1930"; ctx.strokeStyle = "#c83030"; ctx.lineWidth = 1;
-      DuelUtils.roundRect(ctx, CW / 2 - 80, CH - 55, 160, 30, 6);
-      ctx.fillStyle = "#c83030"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText("Villain Mode (V)", CW / 2, CH - 36);
+      DuelUtils.roundRect(ctx, CW / 2 - 80, CH - 50, 160, 26, 6);
+      ctx.fillStyle = "#c83030"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
+      ctx.fillText("Villain Mode (Q)", CW / 2, CH - 33);
     }
 
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
     ctx.fillText("Arrows: Select \u2022 Space: Confirm", CW / 2, CH - 8);
     ctx.textAlign = "left";
-
-    /* V key for villain mode */
-    if (DuelControls.isJustPressed("flee") && villains.length > 0) {
-      gameState = "VILLAIN_SEL"; villainSelectIndex = 0;
-    }
   }
 
   /* ================================================ WORLD MAP ================================================ */
@@ -148,6 +304,20 @@
         DuelQuestEngine.onEvent("arrived", { locationId: sel });
         DuelQuestEngine.autoStartAvailable();
         locationMenuIndex = 0;
+
+        /* Check for quest with Chiron intro at this location */
+        var locQuests = DuelQuestEngine.getAvailableQuests(sel);
+        for (var i = 0; i < locQuests.length; i++) {
+          var q = locQuests[i];
+          var qs = DuelProgression.getQuestStatus(q.id);
+          if (!qs) {
+            DuelQuestEngine.startQuest(q.id);
+            if (q.chironIntro) {
+              showDialogue("Chiron", q.chironIntro, "#d4a017", function () { gameState = "LOCATION"; });
+              return;
+            }
+          }
+        }
         gameState = "LOCATION";
       }
     }
@@ -159,8 +329,27 @@
   function updateLocation() {
     var locId = DuelWorldMap.getSelected();
     var locEnemies = DuelEnemyDefs.getByLocation(locId);
-    var locQuests = DuelQuestEngine.getAvailableQuests(locId);
-    var items = locEnemies.concat(locQuests);
+
+    /* Only show enemies that are current quest targets or already defeated */
+    var activeQuests = DuelQuestEngine.getActiveQuests();
+    var questTargets = {};
+    for (var q = 0; q < activeQuests.length; q++) {
+      var quest = activeQuests[q];
+      var qs = DuelProgression.getQuestStatus(quest.id);
+      if (qs && qs.status === "active" && qs.step >= 0 && qs.step < quest.steps.length) {
+        var step = quest.steps[qs.step];
+        if (step.type === "defeat") questTargets[step.target] = { quest: quest, step: step, stepIdx: qs.step };
+      }
+    }
+
+    /* Build item list: quest-target enemies + beaten enemies you can refight */
+    var items = [];
+    for (var i = 0; i < locEnemies.length; i++) {
+      var e = locEnemies[i];
+      if (questTargets[e.id] || DuelProgression.isEnemyDefeated(e.id)) {
+        items.push(e);
+      }
+    }
     if (items.length === 0) items = [{ id: "__back", name: "Back to Map" }];
 
     if (DuelControls.isJustPressed("down") || DuelControls.isJustPressed("right")) locationMenuIndex = (locationMenuIndex + 1) % items.length;
@@ -170,12 +359,15 @@
       var item = items[locationMenuIndex];
       if (item.id === "__back") { gameState = "MAP"; return; }
       if (item.hp !== undefined) {
-        startFight(item.id, locId);
-      } else if (item.steps) {
-        /* It's a quest — auto-start */
-        var s = DuelProgression.getQuestStatus(item.id);
-        if (!s) DuelQuestEngine.startQuest(item.id);
-        gameState = "MAP";
+        /* Show Chiron dialogue before fight if it's a quest target */
+        var qt = questTargets[item.id];
+        if (qt && qt.step.chironBefore) {
+          showDialogue("Chiron", qt.step.chironBefore, "#d4a017", function () {
+            startFight(item.id, locId);
+          });
+        } else {
+          startFight(item.id, locId);
+        }
       }
     }
     if (DuelControls.isJustPressed("block")) { gameState = "MAP"; }
@@ -192,61 +384,67 @@
     ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
     ctx.fillText(loc.desc, CW / 2, 48);
 
+    /* Active quest hint */
+    var activeQuests = DuelQuestEngine.getActiveQuests();
+    for (var aq = 0; aq < activeQuests.length; aq++) {
+      var quest = activeQuests[aq];
+      if (quest.locationId === locId) {
+        var qs = DuelProgression.getQuestStatus(quest.id);
+        if (qs && qs.step >= 0 && qs.step < quest.steps.length) {
+          ctx.fillStyle = "#d4a017"; ctx.font = "bold 11px monospace";
+          ctx.fillText("Quest: " + quest.steps[qs.step].text, CW / 2, 66);
+        }
+        break;
+      }
+    }
+
     var locEnemies = DuelEnemyDefs.getByLocation(locId);
-    var locQuests = DuelQuestEngine.getAvailableQuests(locId);
+    var questTargets = {};
+    for (var q = 0; q < activeQuests.length; q++) {
+      var qst = activeQuests[q];
+      var qss = DuelProgression.getQuestStatus(qst.id);
+      if (qss && qss.status === "active" && qss.step >= 0 && qss.step < qst.steps.length) {
+        var step = qst.steps[qss.step];
+        if (step.type === "defeat") questTargets[step.target] = true;
+      }
+    }
+
     var items = [];
+    for (var i = 0; i < locEnemies.length; i++) {
+      var e = locEnemies[i];
+      if (questTargets[e.id] || DuelProgression.isEnemyDefeated(e.id)) items.push(e);
+    }
+    if (items.length === 0) items = [{ id: "__back", name: "Back to Map" }];
 
-    /* Section: Enemies */
-    for (var i = 0; i < locEnemies.length; i++) items.push({ data: locEnemies[i], type: "enemy" });
-    /* Section: Quests */
-    for (var j = 0; j < locQuests.length; j++) items.push({ data: locQuests[j], type: "quest" });
-    if (items.length === 0) items.push({ data: { id: "__back", name: "Back to Map" }, type: "action" });
-
-    var yStart = 70;
+    var yStart = 85;
     for (var k = 0; k < items.length; k++) {
-      var item = items[k];
-      var y = yStart + k * 30;
+      var it = items[k];
+      var y = yStart + k * 32;
       var sel = k === locationMenuIndex;
 
       ctx.fillStyle = sel ? "#1a1930" : "#12111f";
       ctx.strokeStyle = sel ? "#8b7fd4" : "#2a2845";
       ctx.lineWidth = sel ? 2 : 1;
-      DuelUtils.roundRect(ctx, 60, y, CW - 120, 26, 4);
+      DuelUtils.roundRect(ctx, 60, y, CW - 120, 28, 4);
 
       ctx.textAlign = "left";
-      if (item.type === "enemy") {
-        var e = item.data;
-        var beaten = DuelProgression.isEnemyDefeated(e.id);
-        ctx.fillStyle = sel ? "#e8e6f0" : "#9a96b0"; ctx.font = "bold 10px monospace";
-        ctx.fillText((beaten ? "\u2713 " : "") + e.name + " \u2014 " + e.subtitle, 70, y + 17);
-        ctx.fillStyle = "#6a6a8a"; ctx.font = "9px monospace"; ctx.textAlign = "right";
-        ctx.fillText("Tier " + e.tier + " | HP:" + e.hp, CW - 70, y + 17);
-      } else if (item.type === "quest") {
-        var q = item.data;
-        ctx.fillStyle = "#d4a017"; ctx.font = "bold 10px monospace";
-        ctx.fillText("\u2606 " + q.name, 70, y + 17);
-        ctx.fillStyle = "#9a96b0"; ctx.font = "9px monospace"; ctx.textAlign = "right";
-        ctx.fillText(q.type, CW - 70, y + 17);
-      } else {
+      if (it.id === "__back") {
         ctx.fillStyle = "#9a96b0"; ctx.font = "10px monospace";
-        ctx.fillText(item.data.name, 70, y + 17);
+        ctx.fillText("Back to Map", 70, y + 18);
+      } else {
+        var beaten = DuelProgression.isEnemyDefeated(it.id);
+        var isTarget = questTargets[it.id];
+        ctx.fillStyle = isTarget ? "#d4a017" : (sel ? "#e8e6f0" : "#9a96b0");
+        ctx.font = "bold 10px monospace";
+        ctx.fillText((beaten ? "\u2713 " : (isTarget ? "\u25b6 " : "")) + it.name + " \u2014 " + it.subtitle, 70, y + 18);
+        ctx.fillStyle = "#6a6a8a"; ctx.font = "9px monospace"; ctx.textAlign = "right";
+        ctx.fillText("Tier " + it.tier + " | HP:" + it.hp, CW - 70, y + 18);
       }
-    }
-
-    /* Check if all enemies here are beaten — show guidance */
-    var allBeaten = locEnemies.length > 0;
-    for (var ab = 0; ab < locEnemies.length; ab++) {
-      if (!DuelProgression.isEnemyDefeated(locEnemies[ab].id)) { allBeaten = false; break; }
-    }
-    if (allBeaten && locEnemies.length > 0) {
-      ctx.fillStyle = "#8b7fd4"; ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText("All enemies defeated here! Press Shift to go back to the World Map", CW / 2, CH - 28);
-      ctx.fillText("and explore newly unlocked locations.", CW / 2, CH - 16);
     }
 
     ctx.textAlign = "center";
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
-    ctx.fillText("Arrows: Select \u2022 Space: Fight/Start \u2022 Shift: Back to Map", CW / 2, CH - 4);
+    ctx.fillText("Arrows: Select \u2022 Space: Fight \u2022 Shift: Back to Map", CW / 2, CH - 8);
     ctx.textAlign = "left";
   }
 
@@ -260,6 +458,12 @@
     var heroDef = DuelHeroDefs.getById(selectedHero);
     player = DuelEntity.createFromHeroDef(heroDef, arena.spawnPlayer.x, arena.spawnPlayer.y, true);
 
+    /* Apply magic items */
+    if (DuelProgression.hasMagicItem("boost_special")) {
+      player.specialCharges++;
+      player.maxSpecialCharges++;
+    }
+
     var enemy = DuelEntity.createFromEnemyDef(enemyDef, arena.spawnEnemy.x, arena.spawnEnemy.y, false);
     enemies = [enemy];
 
@@ -270,29 +474,11 @@
     gameState = "PLAYING";
   }
 
-  function startBattle(battleId) {
-    currentBattleId = battleId;
-    var battle = DuelBattles.get(battleId);
-    if (!battle) return;
-    arena = DuelArenas.get(battle.arenaId);
-
-    var heroDef = DuelHeroDefs.getById(selectedHero);
-    player = DuelEntity.createFromHeroDef(heroDef, arena.spawnPlayer.x, arena.spawnPlayer.y, true);
-
-    DuelCombat.clearAll();
-    DuelCamera.reset();
-    DuelWaves.startBattle(battle, arena);
-    enemies = DuelWaves.getEnemies();
-    controlsHintTimer = 5;
-    gameState = "BATTLE";
-  }
-
-  /* ================================================ PLAYING (single fight) ================================================ */
+  /* ================================================ PLAYING ================================================ */
   function updatePlaying(dt) {
     if (!player || enemies.length === 0) return;
     controlsHintTimer -= dt;
 
-    /* Flee */
     if (DuelControls.isJustPressed("flee") && DuelPhysics.isAtArenaEdge(player, arena)) {
       gameState = "LOCATION"; return;
     }
@@ -301,26 +487,30 @@
     DuelPhysics.update(player, dt, arena);
     DuelStatus.update(player, dt);
 
-    /* Enemy */
     var enemy = enemies[0];
-    var action = DuelAI.update(enemy, player, dt, arena);
-    handleEnemyAction(action, enemy);
+    if (isVillainMode) {
+      var heroAction = DuelAI.updateHeroAI(enemy, player, dt, arena);
+      if (heroAction === "melee") handleHeroAIAttack(enemy);
+    } else {
+      var action = DuelAI.update(enemy, player, dt, arena);
+      handleEnemyAction(action, enemy);
+    }
     DuelPhysics.update(enemy, dt, arena);
     DuelStatus.update(enemy, dt);
     updateTimers(enemy, dt);
 
-    /* Player attack hit */
     checkPlayerAttackHit();
-
-    /* Pools */
     DuelPhysics.checkPoolInteractions(player, dt, arena, selectedHero);
     DuelPhysics.checkPoolInteractions(enemy, dt, arena, null);
 
-    /* All heroes regen slowly, Magnus regens faster */
+    /* Regen */
     if (player.hp < player.maxHp && player.iFrames <= 0) {
-      var regenRate = selectedHero === "magnus" ? 2.0 : 0.8;
-      player.hp = Math.min(player.maxHp, player.hp + regenRate * dt);
+      var regen = selectedHero === "magnus" ? 2.0 : 0.8;
+      player.hp = Math.min(player.maxHp, player.hp + regen * dt);
     }
+
+    /* Healing item: reduce damage taken */
+    /* (applied in applyDamage via engine check — see combat) */
 
     DuelCombat.updateProjectiles(dt, player, enemies, arena);
     DuelCombat.updateParticles(dt);
@@ -328,7 +518,6 @@
     DuelCamera.update(player, arena.width, dt);
     updateTimers(player, dt);
 
-    /* Win/lose */
     if (enemy.hp <= 0) {
       DuelProgression.recordDefeat(currentEnemyId);
       DuelQuestEngine.onEvent("enemy_defeated", { enemyId: currentEnemyId });
@@ -338,44 +527,33 @@
     if (player.hp <= 0) gameState = "DEFEAT";
   }
 
-  /* ================================================ BATTLE (multi-wave) ================================================ */
+  /* ================================================ BATTLE ================================================ */
   function updateBattle(dt) {
     if (!player) return;
     controlsHintTimer -= dt;
-
     updatePlayerInput(dt);
     DuelPhysics.update(player, dt, arena);
     DuelStatus.update(player, dt);
-
     DuelWaves.update(player, dt, arena);
     enemies = DuelWaves.getEnemies();
-
     checkPlayerAttackHit();
     DuelPhysics.checkPoolInteractions(player, dt, arena, selectedHero);
-
     if (player.hp < player.maxHp && player.iFrames <= 0) {
-      var regenRate2 = selectedHero === "magnus" ? 2.0 : 0.8;
-      player.hp = Math.min(player.maxHp, player.hp + regenRate2 * dt);
+      player.hp = Math.min(player.maxHp, player.hp + 0.8 * dt);
     }
-
     DuelCombat.updateProjectiles(dt, player, enemies, arena);
     DuelCombat.updateParticles(dt);
     DuelCombat.updateDamageNumbers(dt);
     DuelCamera.update(player, arena.width, dt);
     updateTimers(player, dt);
-
     if (DuelWaves.isBattleOver() && DuelWaves.allEnemiesDead()) {
-      if (currentBattleId) {
-        DuelProgression.completeBattle(currentBattleId);
-        DuelQuestEngine.onEvent("battle_won", { battleId: currentBattleId });
-        DuelQuestEngine.autoStartAvailable();
-      }
+      if (currentBattleId) { DuelProgression.completeBattle(currentBattleId); DuelQuestEngine.onEvent("battle_won", { battleId: currentBattleId }); }
       gameState = "VICTORY";
     }
     if (player.hp <= 0) gameState = "DEFEAT";
   }
 
-  /* ================================================ SHARED INPUT ================================================ */
+  /* ================================================ INPUT ================================================ */
   function updatePlayerInput(dt) {
     if (DuelStatus.isStunned(player)) { player.vx = 0; return; }
     if (player.state === "hurt") return;
@@ -383,15 +561,10 @@
     var speedMult = DuelStatus.getSpeedMult(player);
     var moving = false;
 
-    /* Duck */
     if (DuelControls.isAction("down") && player.onGround && player.state !== "attack") {
-      player.isDucking = true;
-      player.state = "duck";
-    } else {
-      player.isDucking = false;
-    }
+      player.isDucking = true; player.state = "duck";
+    } else { player.isDucking = false; }
 
-    /* Movement */
     if (player.state !== "attack" && !player.isDucking) {
       if (DuelControls.isAction("left")) {
         player.vx = -player.speed * speedMult * (player.state === "block" ? 0.3 : 1);
@@ -399,42 +572,38 @@
       } else if (DuelControls.isAction("right")) {
         player.vx = player.speed * speedMult * (player.state === "block" ? 0.3 : 1);
         player.facingRight = true; moving = true;
-      } else {
-        player.vx = 0;
-      }
-    } else if (player.isDucking) {
-      player.vx = 0;
-    }
+      } else { player.vx = 0; }
+    } else if (player.isDucking) { player.vx = 0; }
 
-    /* Jump */
     if (DuelControls.isJustPressed("jump") && player.onGround && !player.isDucking) {
-      player.vy = DuelUtils.JUMP_VEL;
-      player.onGround = false;
+      player.vy = DuelUtils.JUMP_VEL; player.onGround = false;
     }
 
-    /* Block */
     if (DuelControls.isAction("block") && player.state !== "attack" && !player.isDucking) {
       player.state = "block";
-    } else if (player.state === "block") {
-      player.state = "idle";
-    }
+    } else if (player.state === "block") { player.state = "idle"; }
 
-    /* Attack */
     if (DuelControls.isJustPressed("attack") && player.attackCooldown <= 0 && player.state !== "attack") {
-      player.state = "attack";
-      player.stateTimer = DuelUtils.ATTACK_DURATION;
+      player.state = "attack"; player.stateTimer = DuelUtils.ATTACK_DURATION;
       player.attackCooldown = DuelUtils.ATTACK_COOLDOWN;
       if (!player.isDucking) player.vx = 0;
     }
 
-    /* Special */
     if (DuelControls.isJustPressed("special") && player.specialCharges > 0 && player.specialCooldown <= 0) {
       player.specialCharges--;
       player.specialCooldown = 3.0;
-      DuelCombat.executeHeroSpecial(player.specialId, player, enemies);
+      /* Boost of Aggression: one-time +50 damage on special */
+      if (DuelProgression.hasMagicItem("boost_aggression")) {
+        DuelProgression.useMagicItem("boost_aggression");
+        /* Apply extra damage by temporarily boosting atk */
+        player.atk += 50;
+        DuelCombat.executeHeroSpecial(player.specialId, player, enemies);
+        player.atk -= 50;
+      } else {
+        DuelCombat.executeHeroSpecial(player.specialId, player, enemies);
+      }
     }
 
-    /* Animation state */
     if (player.state !== "attack" && player.state !== "hurt" && player.state !== "block" && !player.isDucking) {
       player.state = moving ? "walk" : "idle";
     }
@@ -446,8 +615,6 @@
     for (var i = 0; i < enemies.length; i++) {
       var e = enemies[i];
       if (e.hp <= 0 || e.iFrames > 0) continue;
-      /* Dodge check */
-      if (DuelStatus.getDodgeChance(player) > 0 && Math.random() < DuelStatus.getDodgeChance(player)) continue;
       var eb = DuelCombat.getEntityBox(e);
       if (DuelUtils.rectsOverlap(hb, eb)) {
         var mult = e.isShadow ? 0.2 : 1.0;
@@ -464,9 +631,10 @@
       var hb = DuelCombat.getAttackHitbox(enemy);
       var pb = DuelCombat.getEntityBox(player);
       if (DuelUtils.rectsOverlap(hb, pb)) {
-        /* Check player dodge */
         if (DuelStatus.getDodgeChance(player) > 0 && Math.random() < DuelStatus.getDodgeChance(player)) return;
         var dmg = Math.max(1, Math.round(enemy.atk * DuelStatus.getAtkMult(enemy) * 0.7 - player.def * 0.5 + GameUtils.randomInt(-1, 1)));
+        /* Boost of Healing: -10 damage */
+        if (DuelProgression.hasMagicItem("boost_healing")) dmg = Math.max(1, dmg - 10);
         DuelCombat.applyDamage(player, dmg, enemy.x > player.x, player.state === "block");
       }
     }
@@ -474,6 +642,7 @@
       var chb = { x: enemy.x - 10, y: enemy.y, w: enemy.w * S + 20, h: enemy.h * S };
       if (DuelUtils.rectsOverlap(chb, DuelCombat.getEntityBox(player))) {
         var cdmg = Math.max(1, Math.round(enemy.atk * 0.9 - player.def * 0.4 + GameUtils.randomInt(0, 2)));
+        if (DuelProgression.hasMagicItem("boost_healing")) cdmg = Math.max(1, cdmg - 10);
         DuelCombat.applyDamage(player, cdmg, enemy.x > player.x, player.state === "block");
       }
     }
@@ -488,6 +657,15 @@
     }
   }
 
+  function handleHeroAIAttack(heroEntity) {
+    var hb = DuelCombat.getAttackHitbox(heroEntity);
+    var pb = DuelCombat.getEntityBox(player);
+    if (DuelUtils.rectsOverlap(hb, pb)) {
+      var dmg = Math.max(1, Math.round(heroEntity.atk * 0.8 - player.def * 0.3 + GameUtils.randomInt(-1, 2)));
+      DuelCombat.applyDamage(player, dmg, heroEntity.x > player.x, player.state === "block");
+    }
+  }
+
   function updateTimers(entity, dt) {
     if (entity.stateTimer > 0) {
       entity.stateTimer -= dt;
@@ -496,6 +674,163 @@
     if (entity.attackCooldown > 0) entity.attackCooldown -= dt;
     if (entity.iFrames > 0) entity.iFrames -= dt;
     if (entity.specialCooldown > 0) entity.specialCooldown -= dt;
+  }
+
+  /* ================================================ VICTORY ================================================ */
+  function updateVictory() {
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      DuelWaves.clear();
+
+      /* Check if a quest step was completed and has Chiron dialogue */
+      var activeQuests = DuelQuestEngine.getActiveQuests();
+      var showedDialogue = false;
+
+      for (var i = 0; i < DuelQuests.quests.length; i++) {
+        var q = DuelQuests.quests[i];
+        var qs = DuelProgression.getQuestStatus(q.id);
+
+        /* Quest just completed? Show reward dialogue */
+        if (qs && qs.status === "completed") {
+          if (q.rewards && q.rewards.chironReward && !qs.rewardShown) {
+            qs.rewardShown = true;
+            DuelProgression.save();
+
+            if (q.rewards.rewardChoice) {
+              showDialogue("Chiron", q.rewards.chironReward, "#d4a017", function () {
+                showRewardChoice(q);
+              });
+            } else {
+              showDialogue("Chiron", q.rewards.chironReward, "#d4a017", function () { gameState = "LOCATION"; });
+            }
+            showedDialogue = true;
+            break;
+          }
+        }
+
+        /* Quest step just advanced? Show after-dialogue */
+        if (qs && qs.status === "active" && qs.step > 0 && qs.step < q.steps.length) {
+          var prevStep = q.steps[qs.step - 1];
+          if (prevStep && prevStep.chironAfter && prevStep.target === currentEnemyId) {
+            showDialogue("Chiron", prevStep.chironAfter, "#d4a017", function () { gameState = "LOCATION"; });
+            showedDialogue = true;
+            break;
+          }
+        }
+      }
+
+      if (!showedDialogue) {
+        isVillainMode = false;
+        gameState = "LOCATION";
+      }
+    }
+  }
+
+  function updateDefeat() {
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      DuelWaves.clear();
+      isVillainMode = false;
+      gameState = "LOCATION";
+    }
+  }
+
+  function renderResult(victory) {
+    renderPlayingScene();
+    ctx.fillStyle = victory ? "rgba(15, 14, 23, 0.75)" : "rgba(30, 10, 10, 0.8)";
+    ctx.fillRect(0, 0, CW, CH);
+    ctx.textAlign = "center";
+    if (victory) {
+      ctx.fillStyle = "#2d8a4e"; ctx.font = "bold 36px monospace";
+      ctx.fillText("VICTORY!", CW / 2, 140);
+      ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
+      ctx.fillText((enemies[0] ? enemies[0].name : "Enemy") + " defeated!", CW / 2, 180);
+    } else {
+      ctx.fillStyle = "#c93030"; ctx.font = "bold 36px monospace";
+      ctx.fillText("DEFEATED", CW / 2, 140);
+      ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
+      ctx.fillText("But legends never truly die.", CW / 2, 180);
+    }
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
+    ctx.fillText("Press Space to continue", CW / 2, 280);
+    ctx.textAlign = "left";
+  }
+
+  /* ================================================ REWARD CHOICE ================================================ */
+  function showRewardChoice(quest) {
+    currentQuestRewards = quest;
+    rewardChoices = [];
+
+    /* Option 1: always a magic item choice */
+    var itemOptions = [];
+    if (!DuelProgression.hasMagicItem("boost_aggression")) itemOptions.push("boost_aggression");
+    if (!DuelProgression.hasMagicItem("boost_healing")) itemOptions.push("boost_healing");
+    if (!DuelProgression.hasMagicItem("boost_special")) itemOptions.push("boost_special");
+    if (itemOptions.length > 0) {
+      rewardChoices.push({ type: "item", id: itemOptions[0], label: DuelProgression.MAGIC_ITEMS[itemOptions[0]].name,
+        desc: DuelProgression.MAGIC_ITEMS[itemOptions[0]].desc, color: DuelProgression.MAGIC_ITEMS[itemOptions[0]].color });
+    }
+    if (itemOptions.length > 1) {
+      rewardChoices.push({ type: "item", id: itemOptions[1], label: DuelProgression.MAGIC_ITEMS[itemOptions[1]].name,
+        desc: DuelProgression.MAGIC_ITEMS[itemOptions[1]].desc, color: DuelProgression.MAGIC_ITEMS[itemOptions[1]].color });
+    }
+
+    /* Option 2: a character unlock if available from quest rewards */
+    /* (Characters from quest rewards are auto-unlocked, but we still show the choice for feel) */
+
+    rewardChoiceIndex = 0;
+    gameState = "REWARD";
+  }
+
+  function updateReward() {
+    if (rewardChoices.length === 0) { gameState = "LOCATION"; return; }
+    if (DuelControls.isJustPressed("left") || DuelControls.isJustPressed("right")) {
+      rewardChoiceIndex = (rewardChoiceIndex + 1) % rewardChoices.length;
+    }
+    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
+      var choice = rewardChoices[rewardChoiceIndex];
+      if (choice.type === "item") {
+        DuelProgression.addMagicItem(choice.id);
+      }
+      showDialogue("Chiron", "An excellent choice! " + choice.label + " is yours. Now go forth, hero!", "#d4a017", function () {
+        gameState = "LOCATION";
+      });
+    }
+  }
+
+  function renderReward() {
+    ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#d4a017"; ctx.font = "bold 20px monospace";
+    ctx.fillText("Choose Your Reward", CW / 2, 50);
+    ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
+    ctx.fillText("Chiron offers you a gift. Choose wisely!", CW / 2, 75);
+
+    var totalW = rewardChoices.length * 220 + (rewardChoices.length - 1) * 20;
+    var startX = (CW - totalW) / 2;
+
+    for (var i = 0; i < rewardChoices.length; i++) {
+      var rc = rewardChoices[i];
+      var cx = startX + i * 240;
+      var sel = i === rewardChoiceIndex;
+
+      ctx.fillStyle = sel ? "#1a1930" : "#12111f";
+      ctx.strokeStyle = sel ? rc.color : "#2a2845";
+      ctx.lineWidth = sel ? 3 : 1;
+      DuelUtils.roundRect(ctx, cx, 100, 200, 180, 10);
+
+      ctx.fillStyle = rc.color; ctx.font = "bold 14px monospace";
+      ctx.fillText(rc.label, cx + 100, 140);
+      ctx.fillStyle = "#e8e6f0"; ctx.font = "11px monospace";
+      wrapText(ctx, rc.desc, cx + 15, 165, 170, 16);
+
+      if (sel) {
+        ctx.fillStyle = rc.color;
+        ctx.fillRect(cx + 80, 290, 40, 4);
+      }
+    }
+
+    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
+    ctx.fillText("Arrow keys to choose \u2022 Space to select", CW / 2, 350);
+    ctx.textAlign = "left";
   }
 
   /* ================================================ VILLAIN SELECT ================================================ */
@@ -515,23 +850,17 @@
     if (!enemyDef) return;
     arena = DuelArenas.get(enemyDef.locationId);
     isVillainMode = true;
-
-    /* Player is the villain */
     player = DuelEntity.createFromEnemyDef(enemyDef, arena.spawnPlayer.x, arena.spawnPlayer.y, true);
     player.facingRight = true;
-
-    /* Enemy is a random unlocked hero */
     var heroIds = DuelProgression.get().unlockedHeroes;
     var heroId = heroIds[GameUtils.randomInt(0, heroIds.length - 1)];
     var heroDef = DuelHeroDefs.getById(heroId);
     var heroEntity = DuelEntity.createFromHeroDef(heroDef, arena.spawnEnemy.x, arena.spawnEnemy.y, false);
     heroEntity.facingRight = false;
     enemies = [heroEntity];
-
     selectedHero = villainId;
     currentEnemyId = heroId;
-    DuelCombat.clearAll();
-    DuelCamera.reset();
+    DuelCombat.clearAll(); DuelCamera.reset();
     controlsHintTimer = 5;
     gameState = "PLAYING";
   }
@@ -541,8 +870,7 @@
     ctx.fillStyle = "#c83030"; ctx.font = "bold 24px monospace"; ctx.textAlign = "center";
     ctx.fillText("Villain Mode", CW / 2, 30);
     ctx.fillStyle = "#9a96b0"; ctx.font = "11px monospace";
-    ctx.fillText("Play as a defeated villain against hero AI", CW / 2, 50);
-
+    ctx.fillText("Play as a defeated villain vs hero AI", CW / 2, 50);
     var villains = DuelProgression.get().unlockedVillains;
     for (var i = 0; i < villains.length; i++) {
       var vDef = DuelEnemyDefs.getById(villains[i]);
@@ -555,8 +883,6 @@
       DuelUtils.roundRect(ctx, 100, y, CW - 200, 30, 4);
       ctx.fillStyle = sel ? "#e8e6f0" : "#9a96b0"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left";
       ctx.fillText(vDef.name + " \u2014 " + vDef.subtitle, 110, y + 20);
-      ctx.fillStyle = "#6a6a8a"; ctx.font = "9px monospace"; ctx.textAlign = "right";
-      ctx.fillText("HP:" + vDef.hp + " ATK:" + vDef.atk, CW - 110, y + 20);
     }
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
     ctx.fillText("Arrows: Select \u2022 Space: Fight \u2022 Shift: Back", CW / 2, CH - 8);
@@ -574,112 +900,33 @@
     ctx.fillStyle = "#0f0e17"; ctx.fillRect(0, 0, CW, CH);
     ctx.fillStyle = "#d4a017"; ctx.font = "bold 22px monospace"; ctx.textAlign = "center";
     ctx.fillText("Quest Log", CW / 2, 28);
-
     var log = DuelQuestEngine.getQuestLog();
     if (log.length === 0) {
       ctx.fillStyle = "#6a6a8a"; ctx.font = "12px monospace";
       ctx.fillText("No quests yet. Explore the world map!", CW / 2, 100);
     }
-
     for (var i = 0; i < log.length; i++) {
       var entry = log[i];
       var q = entry.quest;
       var y = 50 + i * 50;
       if (y > CH - 30) break;
-
       ctx.fillStyle = entry.status === "completed" ? "#1a2a1a" : "#1a1930";
       ctx.strokeStyle = entry.status === "completed" ? "#2d8a4e" : "#8b7fd4";
       ctx.lineWidth = 1;
       DuelUtils.roundRect(ctx, 20, y, CW - 40, 44, 4);
-
       ctx.textAlign = "left";
       ctx.fillStyle = entry.status === "completed" ? "#2d8a4e" : "#e8e6f0";
       ctx.font = "bold 11px monospace";
       ctx.fillText((entry.status === "completed" ? "\u2713 " : "\u25cb ") + q.name, 30, y + 16);
       ctx.fillStyle = "#9a96b0"; ctx.font = "9px monospace";
       ctx.fillText(q.desc, 30, y + 30);
-
       if (entry.status === "active" && entry.step >= 0 && entry.step < q.steps.length) {
         ctx.fillStyle = "#d4a017"; ctx.font = "8px monospace";
         ctx.fillText("\u25b6 " + q.steps[entry.step].text, 30, y + 42);
       }
     }
-
     ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace"; ctx.textAlign = "center";
     ctx.fillText("Tab or Shift: Close", CW / 2, CH - 8);
-    ctx.textAlign = "left";
-  }
-
-  /* ================================================ RESULT ================================================ */
-  var resultRewards = null;
-
-  function updateResult() {
-    if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
-      DuelWaves.clear();
-      isVillainMode = false;
-      resultRewards = null;
-      gameState = "MAP";
-    }
-  }
-
-  function checkNewRewards() {
-    /* Check what was just unlocked so we can show it */
-    var rewards = [];
-    var log = DuelQuestEngine.getQuestLog();
-    for (var i = 0; i < log.length; i++) {
-      if (log[i].status === "completed") {
-        var r = log[i].quest.rewards;
-        if (r) {
-          if (r.unlockLocation) {
-            var loc = DuelLocations.get(r.unlockLocation);
-            if (loc) rewards.push("New location: " + loc.name);
-          }
-          if (r.unlockHero) {
-            var h = DuelHeroDefs.getById(r.unlockHero);
-            if (h) rewards.push("New hero: " + h.name);
-          }
-          if (r.unlockVillain) rewards.push("Villain mode unlocked: " + r.unlockVillain);
-        }
-      }
-    }
-    return rewards;
-  }
-
-  function renderResult(victory) {
-    renderPlayingScene();
-    ctx.fillStyle = victory ? "rgba(15, 14, 23, 0.75)" : "rgba(30, 10, 10, 0.8)";
-    ctx.fillRect(0, 0, CW, CH);
-    ctx.textAlign = "center";
-
-    if (victory) {
-      ctx.fillStyle = "#2d8a4e"; ctx.font = "bold 36px monospace";
-      ctx.fillText("VICTORY!", CW / 2, 120);
-      ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
-      ctx.fillText((enemies[0] ? enemies[0].name : "Enemy") + " defeated!", CW / 2, 155);
-
-      /* Show rewards */
-      if (!resultRewards) resultRewards = checkNewRewards();
-      if (resultRewards.length > 0) {
-        ctx.fillStyle = "#d4a017"; ctx.font = "bold 12px monospace";
-        for (var i = 0; i < resultRewards.length; i++) {
-          ctx.fillText(resultRewards[i], CW / 2, 190 + i * 20);
-        }
-      }
-
-      /* Tell the player what to do next */
-      ctx.fillStyle = "#8b7fd4"; ctx.font = "11px monospace";
-      ctx.fillText("Return to the World Map to explore new locations!", CW / 2, 250);
-    } else {
-      ctx.fillStyle = "#c93030"; ctx.font = "bold 36px monospace";
-      ctx.fillText("DEFEATED", CW / 2, 120);
-      ctx.fillStyle = "#e8e6f0"; ctx.font = "14px monospace";
-      ctx.fillText("But legends never truly die.", CW / 2, 160);
-      ctx.fillStyle = "#8b7fd4"; ctx.font = "11px monospace";
-      ctx.fillText("Try again — use Block (Shift) and dodge enemy attacks!", CW / 2, 200);
-    }
-
-    ctx.fillStyle = "#6a6a8a"; ctx.font = "11px monospace";
-    ctx.fillText("Press Space to continue", CW / 2, 300);
     ctx.textAlign = "left";
   }
 
@@ -687,15 +934,19 @@
   function render() {
     ctx.clearRect(0, 0, CW, CH);
     switch (gameState) {
-      case "SELECT":      renderSelect(); break;
-      case "MAP":         DuelWorldMap.render(ctx); break;
-      case "LOCATION":    renderLocation(); break;
-      case "PLAYING":     renderPlayingScene(); renderHUD(); break;
-      case "BATTLE":      renderPlayingScene(); renderBattleHUD(); break;
-      case "VICTORY":     renderResult(true); break;
-      case "DEFEAT":      renderResult(false); break;
-      case "VILLAIN_SEL": renderVillainSelect(); break;
-      case "QUEST_LOG":   renderQuestLog(); break;
+      case "INTRO":        renderIntro(); break;
+      case "PATH_CHOICE":  renderPathChoice(); break;
+      case "SELECT":       renderSelect(); break;
+      case "MAP":          DuelWorldMap.render(ctx); break;
+      case "LOCATION":     renderLocation(); break;
+      case "DIALOGUE":     renderDialogue(); break;
+      case "PLAYING":      renderPlayingScene(); renderHUD(); break;
+      case "BATTLE":       renderPlayingScene(); renderBattleHUD(); break;
+      case "VICTORY":      renderResult(true); break;
+      case "DEFEAT":       renderResult(false); break;
+      case "REWARD":       renderReward(); break;
+      case "VILLAIN_SEL":  renderVillainSelect(); break;
+      case "QUEST_LOG":    renderQuestLog(); break;
     }
   }
 
@@ -718,26 +969,19 @@
     var grad = ctx.createLinearGradient(0, 0, 0, CH);
     grad.addColorStop(0, arena.bgTop); grad.addColorStop(1, arena.bgBot);
     ctx.fillStyle = grad; ctx.fillRect(0, 0, arena.width, CH);
-
     ctx.fillStyle = arena.groundColor;
     ctx.fillRect(0, arena.groundY, arena.width, CH - arena.groundY);
     ctx.fillStyle = DuelUtils.lighten(arena.groundColor, 20);
     ctx.fillRect(0, arena.groundY, arena.width, 2);
-
     for (var i = 0; i < arena.platforms.length; i++) {
       var p = arena.platforms[i];
       ctx.fillStyle = DuelUtils.lighten(arena.groundColor, 15);
       ctx.fillRect(p.x, p.y, p.w, p.h);
-      ctx.fillStyle = DuelUtils.lighten(arena.groundColor, 30);
-      ctx.fillRect(p.x, p.y, p.w, 2);
     }
-
     for (var j = 0; j < arena.obstacles.length; j++) {
       var obs = arena.obstacles[j];
       ctx.fillStyle = "#5a5a4a"; ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-      ctx.fillStyle = "#6a6a5a"; ctx.fillRect(obs.x, obs.y, obs.w, 3);
     }
-
     for (var k = 0; k < arena.pools.length; k++) {
       var pool = arena.pools[k];
       ctx.fillStyle = "rgba(42, 90, 138, 0.5)";
@@ -748,29 +992,21 @@
   function renderEntity(entity) {
     if (!entity || entity.hp <= 0) return;
     if (entity.iFrames > 0 && Math.floor(entity.iFrames * 20) % 2 === 0) return;
-
     var spriteKey = entity.spriteKey || entity.id;
-    var sprites = DuelHeroSprites.sprites[spriteKey] || (DuelEnemySprites.sprites[spriteKey] ? DuelEnemySprites.sprites[spriteKey] : null);
+    var sprites = DuelHeroSprites.sprites[spriteKey] || (DuelEnemySprites.sprites[spriteKey] || null);
     if (!sprites) return;
-
     var frameKey = entity.state;
     if (!sprites[frameKey]) frameKey = "idle";
     var frame = sprites[frameKey];
     if (!frame) return;
-
     var flipX = !entity.facingRight;
     var cacheKey = spriteKey + "_" + frameKey;
-    var cached;
-    if (DuelHeroSprites.sprites[spriteKey]) {
-      cached = DuelHeroSprites.getCached(cacheKey, frame, S, flipX);
-    } else {
-      cached = DuelEnemySprites.getCached(cacheKey, frame, S, flipX);
-    }
-
+    var cached = DuelHeroSprites.sprites[spriteKey]
+      ? DuelHeroSprites.getCached(cacheKey, frame, S, flipX)
+      : DuelEnemySprites.getCached(cacheKey, frame, S, flipX);
     if (entity.isShadow) ctx.globalAlpha = 0.35;
     ctx.drawImage(cached, Math.floor(entity.x), Math.floor(entity.y));
     ctx.globalAlpha = 1;
-
     DuelStatus.render(ctx, entity);
   }
 
@@ -786,42 +1022,26 @@
   }
 
   function renderHUD() {
-    /* Player HP */
     drawBar(10, 10, 200, 14, Math.max(0, player.hp), player.maxHp, "#2d8a4e");
     ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 10px monospace"; ctx.textAlign = "left";
-    var heroName = DuelHeroDefs.getById(selectedHero);
+    var heroName = DuelHeroDefs.getById(selectedHero) || DuelEnemyDefs.getById(selectedHero);
     ctx.fillText(heroName ? heroName.name : selectedHero, 10, 36);
-
     for (var i = 0; i < player.maxSpecialCharges; i++) {
       ctx.fillStyle = i < player.specialCharges ? "#d4a017" : "#2a2845";
       ctx.fillRect(10 + i * 14, 42, 10, 8);
     }
-
-    /* Enemy HP */
     var e = enemies[0];
     if (e && e.hp > 0) {
       drawBar(CW - 210, 10, 200, 14, Math.max(0, e.hp), e.maxHp, "#c93030");
       ctx.textAlign = "right"; ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 10px monospace";
       ctx.fillText(e.name, CW - 10, 36);
-
       ctx.fillStyle = "#d4a017"; ctx.font = "9px monospace"; ctx.textAlign = "center";
       ctx.fillText(e.weakness, CW / 2, CH - 8);
     }
-
-    /* Controls hint */
     if (controlsHintTimer > 0) {
       ctx.globalAlpha = Math.min(1, controlsHintTimer / 2) * 0.5;
       ctx.fillStyle = "#e8e6f0"; ctx.font = "9px monospace"; ctx.textAlign = "center";
       ctx.fillText("WASD:Move  S:Duck  Space:Attack  Shift:Block  E:Special  Q:Flee", CW / 2, CH - 22);
-      ctx.globalAlpha = 1;
-    }
-
-    /* Combat tips based on situation */
-    var tip = getCombatTip(enemies[0]);
-    if (tip) {
-      ctx.fillStyle = "#8b7fd4"; ctx.font = "bold 10px monospace"; ctx.textAlign = "center";
-      ctx.globalAlpha = 0.9;
-      ctx.fillText(tip, CW / 2, 54);
       ctx.globalAlpha = 1;
     }
     ctx.textAlign = "left";
@@ -829,24 +1049,9 @@
 
   function renderBattleHUD() {
     renderHUD();
-    /* Wave indicator */
     ctx.fillStyle = "#d4a017"; ctx.font = "bold 12px monospace"; ctx.textAlign = "center";
     ctx.fillText("Wave " + (DuelWaves.getCurrentWave() + 1) + "/" + DuelWaves.getTotalWaves(), CW / 2, 16);
     ctx.textAlign = "left";
-  }
-
-  function getCombatTip(enemy) {
-    if (!enemy || !player) return null;
-    /* Show tips based on what's happening */
-    if (player.hp < player.maxHp * 0.25) return "Low HP! Use Block (Shift) or Flee (Q at arena edge)";
-    if (enemy.showTelegraph) return "Watch out! Enemy is about to attack — dodge or block!";
-    if (enemy.aiState === "stunned") return "Enemy is stunned — attack now!";
-    if (enemy.aiState === "retreat") return "Enemy retreating — chase and attack!";
-    if (enemy.isShadow) return "Enemy is in shadow form — wait for it to attack";
-    if (player.specialCharges > 0 && player.specialCooldown <= 0 && enemy.hp < enemy.maxHp * 0.4) return "Enemy is weak — use your Special (E) to finish it!";
-    if (enemy.aiState === "cast_special") return "Enemy is casting — rush in and interrupt!";
-    if (enemy.aiType === "charger" && enemy.aiState === "charge") return "Dodge the charge! It'll be stunned if it hits a wall";
-    return null;
   }
 
   function drawBar(x, y, w, h, val, max, color) {
@@ -857,5 +1062,22 @@
     ctx.fillStyle = "#e8e6f0"; ctx.font = "bold 9px monospace"; ctx.textAlign = "center";
     ctx.fillText(Math.ceil(val) + "/" + max, x + w / 2, y + h - 3);
     ctx.textAlign = "left";
+  }
+
+  /* ---- Text wrap helper ---- */
+  function wrapText(c, text, x, y, maxW, lineH) {
+    var words = text.split(" ");
+    var line = "";
+    for (var i = 0; i < words.length; i++) {
+      var test = line + words[i] + " ";
+      if (c.measureText(test).width > maxW && i > 0) {
+        c.fillText(line, x, y);
+        line = words[i] + " ";
+        y += lineH;
+      } else {
+        line = test;
+      }
+    }
+    c.fillText(line, x, y);
   }
 })();

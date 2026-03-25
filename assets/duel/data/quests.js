@@ -1,180 +1,207 @@
 /* ============================================
    Mythic Duel — Quest Definitions
-   Story + side quests across all series
+   Chiron-guided story flow with rewards
    ============================================ */
 
 var DuelQuests = (function () {
   "use strict";
 
   var quests = [
-    /* ---- PJO Story ---- */
+    /* ---- PJO: Camp Half-Blood ---- */
     { id: "quest_training", name: "The First Trial", type: "story", series: "pjo", locationId: "camp_halfblood",
-      desc: "Prove yourself against the camp's challenges.",
+      desc: "Prove yourself at Camp Half-Blood.",
+      chironIntro: "Welcome, young demigod! I am Chiron, trainer of heroes. Your first challenge awaits — the Minotaur has been spotted near camp!",
       steps: [
-        { type: "defeat", target: "alecto", text: "Defeat the Fury Alecto" },
-        { type: "defeat", target: "minotaur", text: "Defeat the Minotaur" }
+        { type: "defeat", target: "minotaur", text: "Defeat the Minotaur",
+          chironBefore: "The Minotaur lurks nearby. Remember: use WASD to move, Space to attack, and Shift to block. You can do this!",
+          chironAfter: "Excellent work! But trouble is not over — Mrs. Dodds has revealed herself as the Fury Alecto!" },
+        { type: "defeat", target: "alecto", text: "Defeat Alecto the Fury",
+          chironBefore: "Alecto is fast but fragile. Stay aggressive and don't let her corner you!",
+          chironAfter: "You have proven yourself a true hero! I have much to tell you..." }
       ],
-      rewards: { unlockLocation: "manhattan", unlockHero: "annabeth" }, prereq: null },
+      rewards: { unlockLocation: "manhattan", unlockHero: "magnus",
+        chironReward: "Incredible! You've cleared Camp Half-Blood. I'm unlocking Manhattan for you — Luke and his forces are gathering there. I've also sent word to Magnus Chase in Valhalla. He'll fight alongside you now. Find him in the hero select screen!" },
+      prereq: null },
 
+    /* ---- PJO: Manhattan ---- */
+    { id: "quest_olympus_gates", name: "Stop Luke's Army", type: "story", series: "pjo", locationId: "manhattan",
+      desc: "Chiron's quest: Stop Luke and his cronies in Manhattan.",
+      chironIntro: "Luke Castellan has gathered monsters in Manhattan. You must stop them before they reach Olympus! Defeat his forces one by one.",
+      steps: [
+        { type: "defeat", target: "procrustes", text: "Defeat Procrustes",
+          chironBefore: "Procrustes — the stretcher. He's slow but hits hard. Keep your distance and strike when he's recovering!",
+          chironAfter: "Well done! But Medusa awaits deeper in the city..." },
+        { type: "defeat", target: "medusa", text: "Defeat Medusa",
+          chironBefore: "Medusa fires a gaze beam — you MUST block it (Shift) or duck (S) to avoid being stunned!",
+          chironAfter: "The Gorgon falls! Now for the real threat..." },
+        { type: "defeat", target: "luke", text: "Defeat Luke Castellan",
+          chironBefore: "Luke is a skilled swordsman. He combos fast — block his strikes and counter when he pauses!",
+          chironAfter: "Luke is defeated! You've saved Manhattan... for now." }
+      ],
+      rewards: { unlockLocation: "underworld", rewardChoice: true,
+        chironReward: "A great victory! As a reward, I offer you a choice..." },
+      prereq: "quest_training" },
+
+    /* ---- PJO: Underworld ---- */
     { id: "quest_underworld_pass", name: "Into the Underworld", type: "story", series: "pjo", locationId: "underworld",
       desc: "Journey to the realm of Hades.",
+      chironIntro: "The Underworld holds dark secrets. Be careful — Cerberus guards the entrance, and worse things lurk below.",
       steps: [
-        { type: "defeat", target: "cerberus", text: "Get past Cerberus" },
-        { type: "defeat", target: "antaeus", text: "Defeat Antaeus in his arena" }
+        { type: "defeat", target: "cerberus", text: "Get past Cerberus",
+          chironBefore: "Cerberus charges in straight lines. Dodge to the side and he'll crash into the wall — then strike while he's stunned!",
+          chironAfter: "Past the guard dog! Antaeus awaits in his arena..." },
+        { type: "defeat", target: "antaeus", text: "Defeat Antaeus",
+          chironBefore: "Antaeus draws strength from the ground. Fight him from the platforms — he's weaker when not touching earth!",
+          chironAfter: "The Underworld is yours to explore." }
       ],
-      rewards: { unlockHero: "nico" }, prereq: "quest_training" },
+      rewards: { unlockHero: "nico", rewardChoice: true,
+        chironReward: "Nico di Angelo has emerged from the shadows to join you! And once again, you may choose a reward..." },
+      prereq: "quest_olympus_gates" },
 
-    { id: "quest_olympus_gates", name: "The Lightning Thief", type: "story", series: "pjo", locationId: "manhattan",
-      desc: "Recover the Master Bolt and face the traitor.",
-      steps: [
-        { type: "defeat", target: "procrustes", text: "Survive Procrustes" },
-        { type: "defeat", target: "medusa", text: "Defeat Medusa" },
-        { type: "defeat", target: "ares", text: "Challenge Ares" }
-      ],
-      rewards: { unlockLocation: "olympus" }, prereq: "quest_training" },
-
+    /* ---- PJO: Olympus ---- */
     { id: "quest_titan_war", name: "The Last Olympian", type: "story", series: "pjo", locationId: "manhattan",
-      desc: "The Titan army marches on Manhattan.",
+      desc: "The Titan army marches on Olympus.",
+      chironIntro: "Kronos himself leads the Titan army! This is the battle for Olympus. Are you ready?",
       steps: [
-        { type: "defeat", target: "kelli", text: "Clear the Empousa" },
-        { type: "defeat", target: "luke", text: "Face Luke Castellan" },
-        { type: "battle", battleId: "battle_manhattan", text: "Survive the Battle of Manhattan" },
-        { type: "defeat", target: "kronos", text: "Defeat Kronos" }
+        { type: "defeat", target: "kelli", text: "Clear the Empousa",
+          chironBefore: "Kelli's empousa are fast. Stay aggressive!",
+          chironAfter: "The path to Kronos is clear..." },
+        { type: "defeat", target: "kronos", text: "Defeat Kronos",
+          chironBefore: "Kronos slows time itself. When he uses his time-slow power, dodge and wait — then rush in during the recharge!",
+          chironAfter: "The Lord of Time falls! Olympus is saved!" }
       ],
-      rewards: { unlockVillain: "kronos" }, prereq: "quest_olympus_gates" },
+      rewards: { unlockLocation: "olympus", unlockVillain: "kronos", rewardChoice: true,
+        chironReward: "You've defeated a Titan Lord! Olympus itself is now accessible. Choose your reward wisely..." },
+      prereq: "quest_underworld_pass" },
 
     /* ---- HoO Story ---- */
     { id: "quest_roman_contact", name: "The Son of Neptune", type: "story", series: "hoo", locationId: "camp_jupiter",
       desc: "Journey to the Roman camp.",
+      chironIntro: "There are Roman demigods too — at Camp Jupiter. They need our help against the Giants.",
       steps: [
-        { type: "defeat", target: "octavian", text: "Deal with Octavian" },
-        { type: "defeat", target: "khione", text: "Defeat Khione" }
+        { type: "defeat", target: "octavian", text: "Deal with Octavian",
+          chironBefore: "Octavian is all talk — fragile once you close the distance.",
+          chironAfter: "But a greater threat looms..." },
+        { type: "defeat", target: "khione", text: "Defeat Khione",
+          chironBefore: "The Snow Goddess fires ice blasts that slow you. Stay close where she's weakest!",
+          chironAfter: "Camp Jupiter is safe!" }
       ],
-      rewards: { unlockLocation: "camp_jupiter", unlockHero: "jason" }, prereq: "quest_training" },
+      rewards: { unlockLocation: "camp_jupiter", unlockHero: "jason", rewardChoice: true,
+        chironReward: "Jason Grace joins your ranks! The Roman and Greek camps are united." },
+      prereq: "quest_titan_war" },
 
+    /* ---- More quests follow same pattern ---- */
     { id: "quest_west_coast", name: "The Mark of Athena", type: "story", series: "hoo", locationId: "san_francisco",
-      desc: "Unite the Greek and Roman camps.",
+      desc: "Unite the camps against the Giants.",
+      chironIntro: "The Giants are rising on the West Coast. You must stop them!",
       steps: [
-        { type: "defeat", target: "enceladus", text: "Defeat Enceladus" },
-        { type: "defeat", target: "orion", text: "Hunt Orion" }
+        { type: "defeat", target: "enceladus", text: "Defeat Enceladus",
+          chironBefore: "Enceladus is massive but slow. Dodge his wind-up attacks!",
+          chironAfter: "One Giant down..." },
+        { type: "defeat", target: "orion", text: "Hunt Orion",
+          chironBefore: "Orion charges like a bull. Side-step and counter!",
+          chironAfter: "San Francisco is clear!" }
       ],
-      rewards: { unlockLocation: "san_francisco", unlockHero: "piper" }, prereq: "quest_roman_contact" },
+      rewards: { unlockLocation: "san_francisco", unlockHero: "piper", rewardChoice: true,
+        chironReward: "Piper McLean joins you!" },
+      prereq: "quest_roman_contact" },
 
-    { id: "quest_beyond_gods", name: "The Son of Neptune", type: "story", series: "hoo", locationId: "alaska",
-      desc: "Venture beyond the gods' reach.",
-      steps: [
-        { type: "defeat", target: "alcyoneus", text: "Defeat Alcyoneus in Alaska" }
-      ],
-      rewards: { unlockLocation: "alaska", unlockHero: "frank" }, prereq: "quest_west_coast" },
-
-    { id: "quest_giant_war", name: "Blood of Olympus", type: "story", series: "hoo", locationId: "olympus",
-      desc: "The Giants march on Olympus itself.",
-      steps: [
-        { type: "defeat", target: "polybotes", text: "Defeat Polybotes" },
-        { type: "defeat", target: "porphyrion", text: "Face the Giant King" },
-        { type: "defeat", target: "gaea", text: "Stop Gaea's awakening" }
-      ],
-      rewards: { unlockHero: "leo", unlockHero2: "hazel" }, prereq: "quest_beyond_gods" },
-
-    { id: "quest_tartarus_descent", name: "The House of Hades", type: "story", series: "hoo", locationId: "tartarus",
-      desc: "Descend into the deepest pit.",
-      steps: [
-        { type: "defeat", target: "pasiphae", text: "Navigate Pasiphae's labyrinth" },
-        { type: "defeat", target: "epiales", text: "Face the God of Nightmares" },
-        { type: "defeat", target: "nyx", text: "Survive Primordial Night" }
-      ],
-      rewards: { unlockLocation: "tartarus" }, prereq: "quest_giant_war" },
-
-    /* ---- ToA Story ---- */
-    { id: "quest_apollo_fall", name: "The Hidden Oracle", type: "story", series: "toa", locationId: "new_rome",
-      desc: "Apollo falls to Earth as a mortal.",
-      steps: [
-        { type: "defeat", target: "nero", text: "Confront Emperor Nero" },
-        { type: "defeat", target: "tarquin", text: "Defeat the Undead King" }
-      ],
-      rewards: { unlockLocation: "new_rome", unlockHero: "meg" }, prereq: "quest_roman_contact" },
-
-    { id: "quest_waystation_call", name: "The Dark Prophecy", type: "story", series: "toa", locationId: "waystation",
-      desc: "Seek shelter at the Waystation.",
-      steps: [
-        { type: "defeat", target: "commodus", text: "Defeat Emperor Commodus" },
-        { type: "defeat", target: "lityerses", text: "Face the Reaper of Men" },
-        { type: "defeat", target: "midas", text: "Survive King Midas" }
-      ],
-      rewards: { unlockLocation: "waystation" }, prereq: "quest_apollo_fall" },
-
-    { id: "quest_tower_nero", name: "The Tower of Nero", type: "story", series: "toa", locationId: "new_rome",
-      desc: "Final confrontation with the Triumvirate.",
-      steps: [
-        { type: "defeat", target: "caligula", text: "Defeat Emperor Caligula" },
-        { type: "defeat", target: "python", text: "Slay Python" }
-      ],
-      rewards: { unlockVillain: "python" }, prereq: "quest_waystation_call" },
-
-    /* ---- Kane Chronicles Story ---- */
     { id: "quest_kane_awakening", name: "The Red Pyramid", type: "story", series: "kc", locationId: "house_of_life",
       desc: "Carter and Sadie discover their powers.",
+      chironIntro: "Egyptian magic stirs in Brooklyn. The Kane siblings need guidance.",
       steps: [
-        { type: "defeat", target: "desjardins", text: "Escape the Chief Lector" },
-        { type: "defeat", target: "sarah_jacobi", text: "Stop the rebel magician" }
+        { type: "defeat", target: "desjardins", text: "Escape the Chief Lector",
+          chironBefore: "Desjardins is a powerful magician. Block his spells!",
+          chironAfter: "Free from the House of Life..." },
+        { type: "defeat", target: "sarah_jacobi", text: "Stop the rebel",
+          chironBefore: "Sarah Jacobi is a rogue magician. Interrupt her casting!",
+          chironAfter: "The rebellion is quelled." }
       ],
-      rewards: { unlockLocation: "house_of_life", unlockHero: "carter" }, prereq: null },
+      rewards: { unlockLocation: "house_of_life", unlockHero: "carter", rewardChoice: true,
+        chironReward: "Carter Kane joins the fight!" },
+      prereq: null },
 
+    { id: "quest_einherji", name: "The Sword of Summer", type: "story", series: "mc", locationId: "valhalla",
+      desc: "Magnus enters Valhalla.",
+      chironIntro: "Norse threats are stirring. Magnus must prove himself in Valhalla.",
+      steps: [
+        { type: "defeat", target: "alderman", text: "Face Alderman",
+          chironBefore: "Alderman is slow and predictable. Good practice!",
+          chironAfter: "But the Fire Giant awaits..." },
+        { type: "defeat", target: "surt", text: "Battle Surt",
+          chironBefore: "Surt shoots fire waves — dodge or duck them! Avoid fire pools.",
+          chironAfter: "Surt falls!" }
+      ],
+      rewards: { unlockLocation: "valhalla", unlockHero: "alex", rewardChoice: true,
+        chironReward: "Alex Fierro joins your team!" },
+      prereq: null },
+
+    /* ---- Egypt deeper ---- */
     { id: "quest_egypt_journey", name: "The Throne of Fire", type: "story", series: "kc", locationId: "egypt",
       desc: "Journey to Egypt to stop Apophis.",
+      chironIntro: "Apophis, the Chaos Serpent, threatens all of Egypt.",
       steps: [
-        { type: "defeat", target: "set", text: "Face Set, Lord of Chaos" },
-        { type: "defeat", target: "sobek", text: "Defeat Sobek" },
-        { type: "defeat", target: "menshikov", text: "Stop Menshikov" }
+        { type: "defeat", target: "set", text: "Face Set",
+          chironBefore: "Set summons storms. He's stationary while casting — rush in!",
+          chironAfter: "Set retreats, but Apophis still looms..." },
+        { type: "defeat", target: "apophis", text: "Destroy Apophis",
+          chironBefore: "Apophis is lightning fast. He slides past you — turn and strike from behind!",
+          chironAfter: "Chaos is defeated!" }
       ],
-      rewards: { unlockLocation: "egypt", unlockHero: "sadie" }, prereq: "quest_kane_awakening" },
+      rewards: { unlockLocation: "egypt", unlockHero: "sadie", unlockVillain: "apophis", rewardChoice: true,
+        chironReward: "Sadie Kane joins! Chaos is banished... for now." },
+      prereq: "quest_kane_awakening" },
 
-    { id: "quest_serpent_shadow", name: "The Serpent's Shadow", type: "story", series: "kc", locationId: "egypt",
-      desc: "The final battle against Chaos itself.",
-      steps: [
-        { type: "defeat", target: "setne", text: "Defeat the ghost magician Setne" },
-        { type: "defeat", target: "apophis", text: "Destroy Apophis" }
-      ],
-      rewards: { unlockVillain: "apophis" }, prereq: "quest_egypt_journey" },
-
-    /* ---- Magnus Chase Story ---- */
-    { id: "quest_einherji", name: "The Sword of Summer", type: "story", series: "mc", locationId: "valhalla",
-      desc: "Magnus dies and enters Valhalla.",
-      steps: [
-        { type: "defeat", target: "alderman", text: "Face Alderman" },
-        { type: "defeat", target: "surt", text: "Battle Surt, Lord of Fire" }
-      ],
-      rewards: { unlockLocation: "valhalla", unlockHero: "alex" }, prereq: null },
-
+    /* ---- Norse deeper ---- */
     { id: "quest_bifrost", name: "The Hammer of Thor", type: "story", series: "mc", locationId: "asgard",
-      desc: "Journey to Asgard to stop Loki's plan.",
+      desc: "Journey to Asgard to stop Loki.",
+      chironIntro: "Loki plots in Asgard. He must be stopped!",
       steps: [
-        { type: "defeat", target: "hrungnir", text: "Defeat the Stone Giant" },
-        { type: "defeat", target: "utgard_loki", text: "See through Utgard-Loki's illusions" },
-        { type: "defeat", target: "loki", text: "Confront Loki" }
+        { type: "defeat", target: "loki", text: "Confront Loki",
+          chironBefore: "Loki teleports! He's briefly vulnerable right after appearing. Strike fast!",
+          chironAfter: "The Trickster is bound... for now." }
       ],
-      rewards: { unlockLocation: "asgard" }, prereq: "quest_einherji" },
+      rewards: { unlockLocation: "asgard", rewardChoice: true,
+        chironReward: "Asgard secured!" },
+      prereq: "quest_einherji" },
 
-    { id: "quest_giant_land", name: "The Ship of the Dead", type: "story", series: "mc", locationId: "jotunheim",
-      desc: "Sail to the land of giants.",
+    /* ---- Tartarus ---- */
+    { id: "quest_tartarus_descent", name: "Into the Abyss", type: "story", series: "pjo", locationId: "tartarus",
+      desc: "Descend into Tartarus itself.",
+      chironIntro: "The deepest pit. Few heroes return from Tartarus. Be brave.",
       steps: [
-        { type: "defeat", target: "fenris", text: "Face the Fenris Wolf" }
+        { type: "defeat", target: "nyx", text: "Survive Nyx",
+          chironBefore: "Nyx is only hittable when she attacks. Wait for her to strike, then counter!",
+          chironAfter: "Primordial Night yields..." },
+        { type: "defeat", target: "typhon", text: "Defeat Typhon",
+          chironBefore: "Typhon, Father of Monsters. His phases change at 75%, 50%, 25% HP. Brief openings each time!",
+          chironAfter: "You have defeated the mightiest monster of all!" }
       ],
-      rewards: { unlockLocation: "jotunheim" }, prereq: "quest_bifrost" },
+      rewards: { unlockLocation: "tartarus", unlockVillain: "typhon",
+        chironReward: "You are a legend among legends! Typhon himself bows to your skill." },
+      prereq: "quest_titan_war" }
+  ];
 
-    /* ---- Ultimate Challenge ---- */
-    { id: "quest_typhon", name: "Father of All Monsters", type: "story", series: "pjo", locationId: "tartarus",
-      desc: "The ultimate challenge awaits in the deepest abyss.",
+  /* ---- Villain quests (Tartarus narrator) ---- */
+  var villainQuests = [
+    { id: "vquest_rise", name: "Rise from Tartarus", type: "villain_story", series: "pjo", locationId: "tartarus",
+      desc: "Tartarus sends you to conquer the world above.",
+      tartarusIntro: "Welcome, creature of darkness. I am Tartarus, the Pit itself. You shall be my champion. Rise... and destroy the heroes!",
       steps: [
-        { type: "defeat", target: "typhon", text: "Defeat Typhon, Father of Monsters" }
+        { type: "defeat", target: "percy", text: "Defeat Percy Jackson",
+          tartarusBefore: "That sea brat stands in your way. Crush him!",
+          tartarusAfter: "Yes! The son of Poseidon falls!" },
+        { type: "defeat", target: "annabeth", text: "Defeat Annabeth Chase",
+          tartarusBefore: "The daughter of Athena thinks she's clever. Show her true power!",
+          tartarusAfter: "Wisdom is no match for raw chaos!" }
       ],
-      rewards: { unlockVillain: "typhon" }, prereq: "quest_tartarus_descent" }
+      rewards: { unlockLocation: "underworld" },
+      prereq: null }
   ];
 
   function getById(id) {
-    for (var i = 0; i < quests.length; i++) {
-      if (quests[i].id === id) return quests[i];
-    }
+    for (var i = 0; i < quests.length; i++) { if (quests[i].id === id) return quests[i]; }
+    for (var j = 0; j < villainQuests.length; j++) { if (villainQuests[j].id === id) return villainQuests[j]; }
     return null;
   }
 
@@ -186,5 +213,7 @@ var DuelQuests = (function () {
     return result;
   }
 
-  return { quests: quests, getById: getById, getByLocation: getByLocation };
+  function getVillainQuests() { return villainQuests; }
+
+  return { quests: quests, villainQuests: villainQuests, getById: getById, getByLocation: getByLocation, getVillainQuests: getVillainQuests };
 })();

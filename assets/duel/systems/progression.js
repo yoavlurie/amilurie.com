@@ -1,42 +1,61 @@
 /* ============================================
    Mythic Duel — Progression System
-   Save/load with v1 migration
+   Save/load, magic items, v1/v2 migration
    ============================================ */
 
 var DuelProgression = (function () {
   "use strict";
 
-  var SAVE_KEY = "amilurie_duel_v2";
+  var SAVE_KEY = "amilurie_duel_v3";
   var data = null;
+
+  /* ---- Magic item definitions ---- */
+  var MAGIC_ITEMS = {
+    boost_aggression: { name: "Boost of Aggression", desc: "Deal 50 bonus damage on next special attack", maxOwned: 1, color: "#c83030" },
+    boost_healing: { name: "Boost of Healing", desc: "Reduce all damage taken by 10 for the fight", maxOwned: 1, color: "#4bc76e" },
+    boost_special: { name: "Boost of Special Attack", desc: "Grants +1 special attack charge per fight", maxOwned: 1, color: "#d4a017" }
+  };
 
   function defaultData() {
     return {
-      version: 2,
+      version: 3,
       selectedHero: "percy",
-      unlockedHeroes: ["percy", "annabeth", "magnus"],
+      unlockedHeroes: ["percy", "annabeth"],
       currentLocation: "camp_halfblood",
       unlockedLocations: ["camp_halfblood"],
       defeatedEnemies: {},
       unlockedVillains: [],
       quests: {},
-      completedBattles: []
+      completedBattles: [],
+      magicItems: [],
+      isVillainPath: false,
+      introSeen: false
     };
   }
 
   function load() {
     try {
-      /* Try v2 first */
       var d = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (d && d.version === 2) { data = d; return; }
+      if (d && d.version === 3) { data = d; return; }
+      /* Try v2 migration */
+      var v2 = JSON.parse(localStorage.getItem("amilurie_duel_v2"));
+      if (v2 && v2.version === 2) {
+        data = defaultData();
+        data.unlockedHeroes = v2.unlockedHeroes || ["percy", "annabeth"];
+        data.defeatedEnemies = v2.defeatedEnemies || {};
+        data.unlockedVillains = v2.unlockedVillains || [];
+        data.unlockedLocations = v2.unlockedLocations || ["camp_halfblood"];
+        data.quests = v2.quests || {};
+        data.completedBattles = v2.completedBattles || [];
+        data.introSeen = true;
+        save();
+        return;
+      }
       /* Try v1 migration */
       var v1 = JSON.parse(localStorage.getItem("amilurie_duel_progress"));
       if (v1 && v1.unlocked) {
         data = defaultData();
-        /* Migrate: unlock enemies based on old progress */
-        var oldRoster = ["chimera","cerberus","loki","medusa","sobek","set","nyx","apophis","kronos","typhon"];
-        for (var i = 0; i < Math.min(v1.unlocked, oldRoster.length); i++) {
-          data.defeatedEnemies[oldRoster[i]] = { count: 1 };
-        }
+        data.introSeen = true;
         save();
         return;
       }
@@ -48,6 +67,11 @@ var DuelProgression = (function () {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ }
   }
 
+  function resetSave() {
+    data = defaultData();
+    save();
+  }
+
   function get() { if (!data) load(); return data; }
 
   function isHeroUnlocked(id) { return get().unlockedHeroes.indexOf(id) >= 0; }
@@ -55,13 +79,11 @@ var DuelProgression = (function () {
 
   function isLocationUnlocked(id) {
     if (get().unlockedLocations.indexOf(id) >= 0) return true;
-    /* Also check if the location's requiresQuest is completed */
-    var loc = DuelLocations ? DuelLocations.get(id) : null;
+    var loc = (typeof DuelLocations !== "undefined") ? DuelLocations.get(id) : null;
     if (loc && loc.unlocked) return true;
     if (loc && loc.requiresQuest) {
       var qs = get().quests[loc.requiresQuest];
       if (qs && qs.status === "completed") {
-        /* Auto-add to unlocked list */
         get().unlockedLocations.push(id);
         save();
         return true;
@@ -90,13 +112,35 @@ var DuelProgression = (function () {
   function isBattleComplete(battleId) { return get().completedBattles.indexOf(battleId) >= 0; }
   function completeBattle(battleId) { if (!isBattleComplete(battleId)) { get().completedBattles.push(battleId); save(); } }
 
+  /* ---- Magic items ---- */
+  function hasMagicItem(id) { return get().magicItems.indexOf(id) >= 0; }
+  function addMagicItem(id) {
+    var item = MAGIC_ITEMS[id];
+    if (!item) return false;
+    var count = 0;
+    for (var i = 0; i < get().magicItems.length; i++) {
+      if (get().magicItems[i] === id) count++;
+    }
+    if (count >= item.maxOwned) return false;
+    get().magicItems.push(id);
+    save();
+    return true;
+  }
+  function useMagicItem(id) {
+    var idx = get().magicItems.indexOf(id);
+    if (idx >= 0) { get().magicItems.splice(idx, 1); save(); return true; }
+    return false;
+  }
+
   return {
-    load: load, save: save, get: get,
+    load: load, save: save, get: get, resetSave: resetSave,
     isHeroUnlocked: isHeroUnlocked, unlockHero: unlockHero,
     isLocationUnlocked: isLocationUnlocked, unlockLocation: unlockLocation,
     isEnemyDefeated: isEnemyDefeated, recordDefeat: recordDefeat,
     isVillainUnlocked: isVillainUnlocked, unlockVillain: unlockVillain,
     getQuestStatus: getQuestStatus, setQuestStatus: setQuestStatus,
-    isBattleComplete: isBattleComplete, completeBattle: completeBattle
+    isBattleComplete: isBattleComplete, completeBattle: completeBattle,
+    hasMagicItem: hasMagicItem, addMagicItem: addMagicItem, useMagicItem: useMagicItem,
+    MAGIC_ITEMS: MAGIC_ITEMS
   };
 })();
