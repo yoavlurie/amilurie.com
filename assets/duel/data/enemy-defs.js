@@ -10,10 +10,10 @@ var DuelEnemyDefs = (function () {
      telegraphTime, attackCooldown, retreatTime, weakness, locationId, tier, specialId, specialCharges] */
   var raw = [
     /* ---- Percy Jackson & Olympians ---- */
-    ["minotaur","Minotaur","Labyrinth Beast",55,5,2,55,"charger",1.4,2.8,1.2,"Stunned after charging walls — dodge and hit!","camp_halfblood",1,"horn_charge",1],
-    ["alecto","Alecto","The Kindly One",45,4,2,70,"basic",1.3,2.5,1.0,"Wait for her to attack, then strike back!","camp_halfblood",1,null,0],
-    ["procrustes","Procrustes","Crusty",60,6,3,50,"heavy",1.4,2.8,1.2,"Very slow — dodge and counter","manhattan",1,null,0],
-    ["chimera","Chimera","Three-Formed Beast",60,6,2,55,"basic",1.3,2.5,1.0,"Attack from behind when it charges","manhattan",1,"fire_wave",1],
+    ["minotaur","Minotaur","Labyrinth Beast",35,3,1,40,"basic",1.8,3.5,1.5,"Walk up and press Space to attack!","camp_halfblood",1,null,0],
+    ["alecto","Alecto","The Kindly One",30,3,1,45,"basic",1.8,3.5,1.5,"Walk up and press Space to attack!","camp_halfblood",1,null,0],
+    ["procrustes","Procrustes","Crusty",40,4,2,40,"heavy",1.6,3.2,1.5,"Very slow — dodge and counter","manhattan",1,null,0],
+    ["chimera","Chimera","Three-Formed Beast",45,4,1,45,"basic",1.5,3.0,1.2,"Attack from behind when it charges","manhattan",1,"fire_wave",1],
     ["medusa","Medusa","The Gorgon",55,7,2,60,"ranged",1.2,2.5,1.0,"Block her gaze to reflect it back","manhattan",2,"gaze_beam",2],
     ["ares","Ares","God of War",80,9,5,85,"duelist",0.8,2.0,0.7,"Parry his strikes at the right moment","olympus",2,"backstab",2],
     ["cerberus","Cerberus","Hound of Hades",65,7,2,90,"charger",1.1,2.2,0.8,"Stunned after charging walls","underworld",2,"horn_charge",2],

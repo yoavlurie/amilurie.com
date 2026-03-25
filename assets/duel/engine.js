@@ -305,9 +305,10 @@
     DuelPhysics.checkPoolInteractions(player, dt, arena, selectedHero);
     DuelPhysics.checkPoolInteractions(enemy, dt, arena, null);
 
-    /* Magnus regen */
-    if (selectedHero === "magnus" && player.hp < player.maxHp) {
-      player.hp = Math.min(player.maxHp, player.hp + 0.5 * dt);
+    /* All heroes regen slowly, Magnus regens faster */
+    if (player.hp < player.maxHp && player.iFrames <= 0) {
+      var regenRate = selectedHero === "magnus" ? 2.0 : 0.8;
+      player.hp = Math.min(player.maxHp, player.hp + regenRate * dt);
     }
 
     DuelCombat.updateProjectiles(dt, player, enemies, arena);
@@ -341,8 +342,9 @@
     checkPlayerAttackHit();
     DuelPhysics.checkPoolInteractions(player, dt, arena, selectedHero);
 
-    if (selectedHero === "magnus" && player.hp < player.maxHp) {
-      player.hp = Math.min(player.maxHp, player.hp + 0.5 * dt);
+    if (player.hp < player.maxHp && player.iFrames <= 0) {
+      var regenRate2 = selectedHero === "magnus" ? 2.0 : 0.8;
+      player.hp = Math.min(player.maxHp, player.hp + regenRate2 * dt);
     }
 
     DuelCombat.updateProjectiles(dt, player, enemies, arena);

@@ -26,7 +26,9 @@ var DuelAI = (function () {
     switch (enemy.aiState) {
       case "idle":
         enemy.vx = 0;
-        if (enemy.aiCooldown <= 0 && dist < 400) enemy.aiState = "chase";
+        /* Tier 1-2 enemies pause longer before chasing */
+        var chaseDelay = (enemy.tier && enemy.tier <= 2) ? 1.5 : 0.3;
+        if (enemy.aiCooldown <= 0 && dist < 350 && enemy.aiTimer <= -chaseDelay) enemy.aiState = "chase";
         /* Use special if available and off cooldown */
         if (enemy.specialId && enemy.specialCharges > 0 && enemy.aiCooldown <= 0 && dist < 300 && Math.random() < 0.008) {
           enemy.aiState = "cast_special";
@@ -139,8 +141,12 @@ var DuelAI = (function () {
         break;
 
       case "retreat":
-        enemy.vx = (player.x > enemy.x ? -1 : 1) * enemy.speed * 0.5 * speedMult;
-        if (enemy.aiTimer <= 0) { enemy.aiState = "idle"; enemy.showTelegraph = false; }
+        enemy.vx = (player.x > enemy.x ? -1 : 1) * enemy.speed * 0.4 * speedMult;
+        if (enemy.aiTimer <= 0) {
+          enemy.aiState = "idle";
+          enemy.aiTimer = 0; /* reset so idle delay kicks in */
+          enemy.showTelegraph = false;
+        }
         break;
 
       case "teleport":
