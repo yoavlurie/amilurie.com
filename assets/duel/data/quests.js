@@ -88,10 +88,9 @@ var DuelQuests = (function () {
           chironAfter: "Camp Jupiter is safe!" }
       ],
       rewards: { unlockHero: "jason", unlockLocation: "san_francisco", rewardChoice: true,
-        chironReward: "Jason Grace joins your ranks! San Francisco awaits — the Giants are gathering on the West Coast." },
+        chironReward: "Jason Grace joins your ranks! San Francisco is now accessible — the Giants are gathering on the West Coast." },
       prereq: "quest_titan_war" },
 
-    /* ---- More quests follow same pattern ---- */
     { id: "quest_west_coast", name: "The Mark of Athena", type: "story", series: "hoo", locationId: "san_francisco",
       desc: "Unite the camps against the Giants.",
       chironIntro: "The Giants are rising on the West Coast. You must stop them!",
@@ -103,8 +102,8 @@ var DuelQuests = (function () {
           chironBefore: "Orion charges like a bull. Side-step and counter!",
           chironAfter: "San Francisco is clear!" }
       ],
-      rewards: { unlockLocation: "san_francisco", unlockHero: "piper", rewardChoice: true,
-        chironReward: "Piper McLean joins you!" },
+      rewards: { unlockLocation: "alaska", unlockLocation2: "new_rome", unlockHero: "piper", rewardChoice: true,
+        chironReward: "Piper McLean joins you! Alaska and New Rome are now accessible — the fight stretches across the continent." },
       prereq: "quest_roman_contact" },
 
     { id: "quest_kane_awakening", name: "The Red Pyramid", type: "story", series: "kc", locationId: "house_of_life",
@@ -118,8 +117,8 @@ var DuelQuests = (function () {
           chironBefore: "Sarah Jacobi is a rogue magician. Interrupt her casting!",
           chironAfter: "The rebellion is quelled." }
       ],
-      rewards: { unlockLocation: "house_of_life", unlockHero: "carter", rewardChoice: true,
-        chironReward: "Carter Kane joins the fight!" },
+      rewards: { unlockLocation: "egypt", unlockHero: "carter", rewardChoice: true,
+        chironReward: "Carter Kane joins the fight! Egypt is now accessible — ancient threats await in the land of the pharaohs." },
       prereq: null },
 
     { id: "quest_einherji", name: "The Sword of Summer", type: "story", series: "mc", locationId: "valhalla",
@@ -133,8 +132,8 @@ var DuelQuests = (function () {
           chironBefore: "Surt shoots fire waves — dodge or duck them! Avoid fire pools.",
           chironAfter: "Surt falls!" }
       ],
-      rewards: { unlockLocation: "valhalla", unlockHero: "alex", rewardChoice: true,
-        chironReward: "Alex Fierro joins your team!" },
+      rewards: { unlockLocation: "asgard", unlockLocation2: "jotunheim", unlockHero: "alex", rewardChoice: true,
+        chironReward: "Alex Fierro joins your team! Asgard and Jotunheim are now accessible — the Norse realms open before you." },
       prereq: null },
 
     /* ---- Egypt deeper ---- */
@@ -149,7 +148,7 @@ var DuelQuests = (function () {
           chironBefore: "Apophis is lightning fast. He slides past you — turn and strike from behind!",
           chironAfter: "Chaos is defeated!" }
       ],
-      rewards: { unlockLocation: "egypt", unlockHero: "sadie", unlockVillain: "apophis", rewardChoice: true,
+      rewards: { unlockHero: "sadie", unlockVillain: "apophis", rewardChoice: true,
         chironReward: "Sadie Kane joins! Chaos is banished... for now." },
       prereq: "quest_kane_awakening" },
 
@@ -162,9 +161,40 @@ var DuelQuests = (function () {
           chironBefore: "Loki teleports! He's briefly vulnerable right after appearing. Strike fast!",
           chironAfter: "The Trickster is bound... for now." }
       ],
-      rewards: { unlockLocation: "asgard", rewardChoice: true,
-        chironReward: "Asgard secured!" },
+      rewards: { rewardChoice: true,
+        chironReward: "Asgard secured! The Norse realms are safe." },
       prereq: "quest_einherji" },
+
+    /* ---- Trials of Apollo ---- */
+    { id: "quest_apollo_fall", name: "The Hidden Oracle", type: "story", series: "toa", locationId: "new_rome",
+      desc: "Apollo falls to Earth as a mortal.",
+      chironIntro: "The Triumvirate of Roman Emperors threatens New Rome. Apollo needs your help!",
+      steps: [
+        { type: "defeat", target: "nero", text: "Confront Emperor Nero",
+          chironBefore: "Nero is a skilled duelist. Counter after his combo strings!",
+          chironAfter: "Nero retreats, but the undead stir..." },
+        { type: "defeat", target: "tarquin", text: "Defeat the Undead King",
+          chironBefore: "Tarquin commands zombies — focus on the king, not the minions!",
+          chironAfter: "New Rome is safe!" }
+      ],
+      rewards: { unlockLocation: "waystation", unlockHero: "meg", rewardChoice: true,
+        chironReward: "Meg McCaffrey joins you! The Waystation is now accessible." },
+      prereq: "quest_west_coast" },
+
+    { id: "quest_waystation_call", name: "The Dark Prophecy", type: "story", series: "toa", locationId: "waystation",
+      desc: "Seek shelter at the Waystation.",
+      chironIntro: "The remaining emperors gather their forces. Stop them at the Waystation!",
+      steps: [
+        { type: "defeat", target: "commodus", text: "Defeat Emperor Commodus",
+          chironBefore: "Commodus is vain but dangerous. Watch for his charges!",
+          chironAfter: "One emperor down..." },
+        { type: "defeat", target: "caligula", text: "Defeat Emperor Caligula",
+          chironBefore: "Caligula is the deadliest of all three. Keep your distance!",
+          chironAfter: "The Triumvirate falls!" }
+      ],
+      rewards: { unlockVillain: "caligula", rewardChoice: true,
+        chironReward: "The Triumvirate is defeated! You can now play as Caligula in Villain Mode." },
+      prereq: "quest_apollo_fall" },
 
     /* ---- Tartarus ---- */
     { id: "quest_tartarus_descent", name: "Into the Abyss", type: "story", series: "pjo", locationId: "tartarus",
