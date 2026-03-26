@@ -455,12 +455,26 @@
       }
     }
 
-    /* Build item list: quest-target enemies + beaten enemies you can refight */
+    /* Build item list: quest-target enemies (even from other locations) + beaten local enemies */
     var items = [];
+    var addedIds = {};
+
+    /* First add quest targets — these appear regardless of their home location */
+    var qtKeys = Object.keys(questTargets);
+    for (var qi = 0; qi < qtKeys.length; qi++) {
+      var qtEnemy = DuelEnemyDefs.getById(qtKeys[qi]);
+      if (qtEnemy && !addedIds[qtEnemy.id]) {
+        items.push(qtEnemy);
+        addedIds[qtEnemy.id] = true;
+      }
+    }
+
+    /* Then add local enemies that have been beaten (for replaying) */
     for (var i = 0; i < locEnemies.length; i++) {
       var e = locEnemies[i];
-      if (questTargets[e.id] || DuelProgression.isEnemyDefeated(e.id)) {
+      if (!addedIds[e.id] && DuelProgression.isEnemyDefeated(e.id)) {
         items.push(e);
+        addedIds[e.id] = true;
       }
     }
     if (items.length === 0) items = [{ id: "__back", name: "Back to Map" }];
