@@ -443,11 +443,13 @@
     var locId = DuelWorldMap.getSelected();
     var locEnemies = DuelEnemyDefs.getByLocation(locId);
 
-    /* Only show enemies that are current quest targets or already defeated */
+    /* Only show enemies that are current quest targets FOR THIS LOCATION or already defeated */
     var activeQuests = DuelQuestEngine.getActiveQuests();
     var questTargets = {};
     for (var q = 0; q < activeQuests.length; q++) {
       var quest = activeQuests[q];
+      /* Only include quests assigned to THIS location */
+      if (quest.locationId !== locId) continue;
       var qs = DuelProgression.getQuestStatus(quest.id);
       if (qs && qs.status === "active" && qs.step >= 0 && qs.step < quest.steps.length) {
         var step = quest.steps[qs.step];
@@ -455,11 +457,11 @@
       }
     }
 
-    /* Build item list: quest-target enemies (even from other locations) + beaten local enemies */
+    /* Build item list: quest-target enemies for this location + beaten local enemies */
     var items = [];
     var addedIds = {};
 
-    /* First add quest targets — these appear regardless of their home location */
+    /* First add quest targets (enemy may be from another location but quest is here) */
     var qtKeys = Object.keys(questTargets);
     for (var qi = 0; qi < qtKeys.length; qi++) {
       var qtEnemy = DuelEnemyDefs.getById(qtKeys[qi]);

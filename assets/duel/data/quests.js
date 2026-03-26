@@ -119,7 +119,7 @@ var DuelQuests = (function () {
       ],
       rewards: { unlockLocation: "egypt", unlockHero: "carter", rewardChoice: true,
         chironReward: "Carter Kane joins the fight! Egypt is now accessible — ancient threats await in the land of the pharaohs." },
-      prereq: null },
+      prereq: "quest_titan_war" },
 
     { id: "quest_einherji", name: "The Sword of Summer", type: "story", series: "mc", locationId: "valhalla",
       desc: "Magnus enters Valhalla.",
@@ -134,7 +134,7 @@ var DuelQuests = (function () {
       ],
       rewards: { unlockLocation: "asgard", unlockLocation2: "jotunheim", unlockHero: "alex", rewardChoice: true,
         chironReward: "Alex Fierro joins your team! Asgard and Jotunheim are now accessible — the Norse realms open before you." },
-      prereq: null },
+      prereq: "quest_titan_war" },
 
     /* ---- Egypt deeper ---- */
     { id: "quest_egypt_journey", name: "The Throne of Fire", type: "story", series: "kc", locationId: "egypt",
