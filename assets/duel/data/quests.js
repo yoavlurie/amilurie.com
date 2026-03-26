@@ -38,8 +38,8 @@ var DuelQuests = (function () {
           chironBefore: "Luke is a skilled swordsman. He combos fast — block his strikes and counter when he pauses!",
           chironAfter: "Luke is defeated! You've saved Manhattan... for now." }
       ],
-      rewards: { unlockLocation: "underworld", rewardChoice: true,
-        chironReward: "A great victory! As a reward, I offer you a choice..." },
+      rewards: { unlockLocation: "underworld", unlockLocation2: "olympus", rewardChoice: true,
+        chironReward: "A great victory! Luke is defeated and the path to Olympus is clear. I've also opened the way to the Underworld. As a reward, I offer you a choice..." },
       prereq: "quest_training" },
 
     /* ---- PJO: Underworld ---- */
