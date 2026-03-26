@@ -851,8 +851,15 @@
       }
 
       if (!showedDialogue) {
-        isVillainMode = false;
-        gameState = "LOCATION";
+        if (isVillainMode) {
+          /* In villain mode, go back to villain select after winning */
+          showDialogue("Tartarus", "Yes! The hero falls before your might! Choose your next form and destroy them all!", "#c83030", function () {
+            villainSelectIndex = 0;
+            gameState = "VILLAIN_SEL";
+          });
+        } else {
+          gameState = "LOCATION";
+        }
         DuelMusic.playMenu();
       }
     }
@@ -861,8 +868,15 @@
   function updateDefeat() {
     if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
       DuelWaves.clear();
-      isVillainMode = false;
-      gameState = "LOCATION";
+      if (isVillainMode) {
+        showDialogue("Tartarus", "Pathetic! Try again, creature of darkness!", "#c83030", function () {
+          villainSelectIndex = 0;
+          gameState = "VILLAIN_SEL";
+        });
+      } else {
+        isVillainMode = false;
+        gameState = "LOCATION";
+      }
     }
   }
 

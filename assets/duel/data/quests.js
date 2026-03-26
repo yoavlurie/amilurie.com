@@ -73,7 +73,7 @@ var DuelQuests = (function () {
       rewards: { unlockLocation: "olympus", unlockLocation2: "camp_jupiter", unlockLocation3: "house_of_life", unlockLocation4: "valhalla",
         unlockVillain: "kronos", rewardChoice: true,
         chironReward: "You've defeated a Titan Lord! Olympus is saved! But our fight is far from over. New threats are rising across the world — the Roman camp at Camp Jupiter needs help, Egyptian magicians stir in Brooklyn, and Norse warriors clash in Valhalla. I've unlocked all three realms for you. The world needs heroes everywhere. Choose your next adventure wisely!" },
-      prereq: "quest_underworld_pass" },
+      prereq: "quest_olympus_gates" },
 
     /* ---- HoO Story ---- */
     { id: "quest_roman_contact", name: "The Son of Neptune", type: "story", series: "hoo", locationId: "camp_jupiter",
