@@ -35,9 +35,17 @@ var DuelWorldMap = (function () {
     var connected = getConnectedNodes(selectedNode);
     if (connected.length === 0) return;
 
-    /* Use angle-based matching: each direction covers a 90-degree cone.
-       right = -45 to +45 degrees, up = -135 to -45, left = 135 to -135, down = 45 to 135 */
+    /* Direction vector */
+    var dirX = 0, dirY = 0;
+    if (direction === "right") dirX = 1;
+    else if (direction === "left") dirX = -1;
+    else if (direction === "up") dirY = -1;
+    else if (direction === "down") dirY = 1;
+
+    /* Try angle-based matching first, then fall back to any connected node */
     var best = null, bestScore = -Infinity;
+    var fallback = null, fallbackDist = Infinity;
+
     for (var i = 0; i < connected.length; i++) {
       var target = DuelLocations.get(connected[i]);
       if (!target) continue;
@@ -46,22 +54,24 @@ var DuelWorldMap = (function () {
       var dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 5) continue;
 
-      /* Calculate how well this node matches the direction (dot product with unit direction) */
-      var dirX = 0, dirY = 0;
-      if (direction === "right") dirX = 1;
-      else if (direction === "left") dirX = -1;
-      else if (direction === "up") dirY = -1;
-      else if (direction === "down") dirY = 1;
-
       var dot = (dx / dist) * dirX + (dy / dist) * dirY;
-      /* Only consider nodes that are at least somewhat in the right direction (dot > 0.2) */
-      if (dot > 0.2) {
-        /* Score: higher dot product (better direction match) wins, with slight preference for closer nodes */
+
+      /* Very low threshold (-0.3) so axis-aligned and diagonal nodes all work.
+         Only nodes clearly in the OPPOSITE direction (dot < -0.3) are excluded. */
+      if (dot > -0.3) {
         var score = dot - dist / 2000;
         if (score > bestScore) { bestScore = score; best = connected[i]; }
       }
+
+      /* Track closest connected node as absolute fallback */
+      if (dist < fallbackDist) { fallbackDist = dist; fallback = connected[i]; }
     }
-    if (best) selectedNode = best;
+
+    if (best) {
+      selectedNode = best;
+    } else if (fallback) {
+      selectedNode = fallback;
+    }
   }
 
   function render(ctx) {

@@ -36,7 +36,7 @@ var DuelProgression = (function () {
   function load() {
     try {
       var d = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (d && d.version === 4) { data = d; return; }
+      if (d && d.version === 6) { data = d; return; }
     } catch (e) { /* ignore */ }
     /* Wipe ALL old saves */
     try { localStorage.removeItem("amilurie_duel_v5"); } catch (e) { /* ignore */ }
