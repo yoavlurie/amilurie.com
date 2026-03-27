@@ -30,6 +30,10 @@
   var rewardChoiceIndex = 0;
   var currentQuestRewards = null;
 
+  /* Cached location menu items (shared between update and render) */
+  var locationItems = [];
+  var locationQuestTargets = {};
+
   /* ================================================ INIT ================================================ */
   document.addEventListener("DOMContentLoaded", function () {
     canvas = document.getElementById("game-canvas");
@@ -439,57 +443,59 @@
   }
 
   /* ================================================ LOCATION MENU ================================================ */
-  function updateLocation() {
+  function buildLocationItems() {
     var locId = DuelWorldMap.getSelected();
     var locEnemies = DuelEnemyDefs.getByLocation(locId);
 
     /* Only show enemies that are current quest targets FOR THIS LOCATION or already defeated */
     var activeQuests = DuelQuestEngine.getActiveQuests();
-    var questTargets = {};
+    locationQuestTargets = {};
     for (var q = 0; q < activeQuests.length; q++) {
       var quest = activeQuests[q];
-      /* Only include quests assigned to THIS location */
       if (quest.locationId !== locId) continue;
       var qs = DuelProgression.getQuestStatus(quest.id);
       if (qs && qs.status === "active" && qs.step >= 0 && qs.step < quest.steps.length) {
         var step = quest.steps[qs.step];
-        if (step.type === "defeat") questTargets[step.target] = { quest: quest, step: step, stepIdx: qs.step };
+        if (step.type === "defeat") locationQuestTargets[step.target] = { quest: quest, step: step, stepIdx: qs.step };
       }
     }
 
-    /* Build item list: quest-target enemies for this location + beaten local enemies */
-    var items = [];
+    locationItems = [];
     var addedIds = {};
 
-    /* First add quest targets (enemy may be from another location but quest is here) */
-    var qtKeys = Object.keys(questTargets);
+    var qtKeys = Object.keys(locationQuestTargets);
     for (var qi = 0; qi < qtKeys.length; qi++) {
       var qtEnemy = DuelEnemyDefs.getById(qtKeys[qi]);
       if (qtEnemy && !addedIds[qtEnemy.id]) {
-        items.push(qtEnemy);
+        locationItems.push(qtEnemy);
         addedIds[qtEnemy.id] = true;
       }
     }
 
-    /* Then add local enemies that have been beaten (for replaying) */
     for (var i = 0; i < locEnemies.length; i++) {
       var e = locEnemies[i];
       if (!addedIds[e.id] && DuelProgression.isEnemyDefeated(e.id)) {
-        items.push(e);
+        locationItems.push(e);
         addedIds[e.id] = true;
       }
     }
-    if (items.length === 0) items = [{ id: "__back", name: "Back to Map" }];
+    if (locationItems.length === 0) locationItems = [{ id: "__back", name: "Back to Map" }];
+  }
 
-    if (DuelControls.isJustPressed("down") || DuelControls.isJustPressed("right")) locationMenuIndex = (locationMenuIndex + 1) % items.length;
-    if (DuelControls.isJustPressed("jump") || DuelControls.isJustPressed("left")) locationMenuIndex = (locationMenuIndex + items.length - 1) % items.length;
+  function updateLocation() {
+    var locId = DuelWorldMap.getSelected();
+    buildLocationItems();
+
+    if (locationMenuIndex >= locationItems.length) locationMenuIndex = 0;
+
+    if (DuelControls.isJustPressed("down") || DuelControls.isJustPressed("right")) locationMenuIndex = (locationMenuIndex + 1) % locationItems.length;
+    if (DuelControls.isJustPressed("jump") || DuelControls.isJustPressed("left")) locationMenuIndex = (locationMenuIndex + locationItems.length - 1) % locationItems.length;
 
     if (DuelControls.isJustPressed("confirm") || DuelControls.isJustPressed("attack")) {
-      var item = items[locationMenuIndex];
+      var item = locationItems[locationMenuIndex];
       if (item.id === "__back") { gameState = "MAP"; return; }
       if (item.hp !== undefined) {
-        /* Show Chiron dialogue before fight if it's a quest target */
-        var qt = questTargets[item.id];
+        var qt = locationQuestTargets[item.id];
         if (qt && qt.step.chironBefore) {
           showDialogue("Chiron", qt.step.chironBefore, "#d4a017", function () {
             startFight(item.id, locId);
@@ -527,23 +533,8 @@
       }
     }
 
-    var locEnemies = DuelEnemyDefs.getByLocation(locId);
-    var questTargets = {};
-    for (var q = 0; q < activeQuests.length; q++) {
-      var qst = activeQuests[q];
-      var qss = DuelProgression.getQuestStatus(qst.id);
-      if (qss && qss.status === "active" && qss.step >= 0 && qss.step < qst.steps.length) {
-        var step = qst.steps[qss.step];
-        if (step.type === "defeat") questTargets[step.target] = true;
-      }
-    }
-
-    var items = [];
-    for (var i = 0; i < locEnemies.length; i++) {
-      var e = locEnemies[i];
-      if (questTargets[e.id] || DuelProgression.isEnemyDefeated(e.id)) items.push(e);
-    }
-    if (items.length === 0) items = [{ id: "__back", name: "Back to Map" }];
+    /* Use the same cached item list that updateLocation() built */
+    var items = locationItems;
 
     var yStart = 85;
     for (var k = 0; k < items.length; k++) {
@@ -562,12 +553,12 @@
         ctx.fillText("Back to Map", 70, y + 18);
       } else {
         var beaten = DuelProgression.isEnemyDefeated(it.id);
-        var isTarget = questTargets[it.id];
+        var isTarget = !!locationQuestTargets[it.id];
         ctx.fillStyle = isTarget ? "#d4a017" : (sel ? "#e8e6f0" : "#9a96b0");
         ctx.font = "bold 10px monospace";
-        ctx.fillText((beaten ? "\u2713 " : (isTarget ? "\u25b6 " : "")) + it.name + " \u2014 " + it.subtitle, 70, y + 18);
+        ctx.fillText((beaten ? "\u2713 " : (isTarget ? "\u25b6 " : "")) + it.name + " \u2014 " + (it.subtitle || ""), 70, y + 18);
         ctx.fillStyle = "#6a6a8a"; ctx.font = "9px monospace"; ctx.textAlign = "right";
-        ctx.fillText("Tier " + it.tier + " | HP:" + it.hp, CW - 70, y + 18);
+        ctx.fillText("Tier " + (it.tier || "?") + " | HP:" + (it.hp || "?"), CW - 70, y + 18);
       }
     }
 
