@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Claude Code local state (shouldn't be committed)
+.claude/
+
+# Per-game build artifacts that have their own repos
+node_modules/
+*.tsbuildinfo
+.env
+.env.*.local
+.vercel
+
+# The Stories has its own GitHub repo at github.com/yoavlurie/the-stories
+# and deploys independently to Vercel — don't track its source here.
+The Stories/
