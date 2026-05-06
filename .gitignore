@@ -14,3 +14,12 @@ node_modules/
 # The Stories has its own GitHub repo at github.com/yoavlurie/the-stories
 # and deploys independently to Vercel — don't track its source here.
 The Stories/
+
+# Myth-o-Magic raw asset libraries (large image dumps + PSDs).
+# Got swept into a commit accidentally on 2026-05-06; keep them on disk
+# but out of the repo. Track specific files explicitly with `git add -f`
+# if any individual asset is meant to be canonical.
+myth-o-magic/Card Art/
+myth-o-magic/Card Exports - 4.20.2016/
+myth-o-magic/Card Images/
+myth-o-magic/Card-Art/
