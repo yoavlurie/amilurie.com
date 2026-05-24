@@ -1,0 +1,16 @@
+# The Stories deploys separately — github.com/yoavlurie/the-stories
+The Stories/
+
+# Myth-o-Magic raw asset libraries (large image dumps + PSDs)
+myth-o-magic/Card Art/
+myth-o-magic/Card Exports - 4.20.2016/
+myth-o-magic/Card Images/
+myth-o-magic/Card-Art/
+
+# Local dev / tooling
+.DS_Store
+.claude/
+node_modules/
+*.tsbuildinfo
+.env
+.env.*.local
