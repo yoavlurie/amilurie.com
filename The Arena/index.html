@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Arena — Ami Lurie</title>
+  <meta name="description" content="The Arena: a real-time demigod action RPG. Explore the world of Percy Jackson, unlock heroes, slay monsters, and complete quests.">
+  <style>
+    :root {
+      --bg: #0b0e1a;
+      --panel: #151a2e;
+      --panel-2: #1d2440;
+      --border: #2a3258;
+      --text: #e8e6f0;
+      --muted: #9994b8;
+      --accent: #f0b945;
+      --accent-2: #6b8eff;
+      --danger: #e04848;
+      --good: #4cd964;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar a, .topbar button {
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+
+    .topbar a:hover, .topbar button:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .topbar h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+
+    .stage {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding: 1.25rem 0.5rem 0.5rem;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      max-width: 100%;
+      width: 960px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #0e1326;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      pointer-events: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      font-size: 0.85rem;
+    }
+
+    .hud-block {
+      background: rgba(11, 14, 26, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.7rem;
+      backdrop-filter: blur(4px);
+    }
+
+    .hp-bar {
+      width: 180px;
+      height: 12px;
+      background: #2a1414;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .hp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #e04848, #f0a040);
+      transition: width 0.2s;
+    }
+
+    .special-pip {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-left: 4px;
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    .special-pip.cooldown {
+      background: #444;
+      box-shadow: none;
+    }
+
+    #toast-stack {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 6px;
+      pointer-events: none;
+      align-items: center;
+    }
+
+    .toast {
+      background: rgba(11, 14, 26, 0.92);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      animation: fade 3.5s forwards;
+    }
+
+    .toast.good { border-color: var(--good); color: var(--good); }
+    .toast.bad { border-color: var(--danger); color: var(--danger); }
+    .toast.info { border-color: var(--accent-2); color: var(--accent-2); }
+
+    @keyframes fade {
+      0% { opacity: 0; transform: translateY(8px); }
+      8% { opacity: 1; transform: translateY(0); }
+      85% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-8px); }
+    }
+
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(11, 14, 26, 0.85);
+      backdrop-filter: blur(6px);
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    #overlay.open { display: flex; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      max-width: 720px;
+      width: 100%;
+      max-height: 90%;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    .panel h2 {
+      color: var(--accent);
+      font-size: 1.3rem;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+
+    .panel h3 {
+      color: var(--accent-2);
+      font-size: 1rem;
+      margin: 1rem 0 0.4rem;
+    }
+
+    .panel .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+      margin-bottom: 0.5rem;
+    }
+
+    .item {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.65rem;
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
+    .item.locked {
+      color: var(--muted);
+      opacity: 0.55;
+    }
+
+    .item.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .item .name { font-weight: 700; display: block; }
+    .item .meta { color: var(--muted); font-size: 0.72rem; }
+
+    .panel button {
+      background: var(--accent);
+      color: #0b0e1a;
+      border: none;
+      padding: 0.5rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 0.75rem;
+    }
+
+    .panel button:hover { background: #ffd060; }
+    .panel button.secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+    .panel button.secondary:hover { background: rgba(240,185,69,0.12); }
+
+    .panel .choice-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .panel .choice-list button {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      text-align: left;
+      padding: 0.65rem 0.85rem;
+      margin: 0;
+    }
+
+    .panel .choice-list button:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .help {
+      max-width: 960px;
+      margin: 0.5rem auto 2rem;
+      padding: 0.75rem 1rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+
+    .help strong { color: var(--accent); }
+    .help kbd {
+      display: inline-block;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.1rem 0.45rem;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.78rem;
+      color: var(--text);
+      margin: 0 2px;
+    }
+
+    @media (max-width: 700px) {
+      .topbar h1 { font-size: 0.95rem; }
+      .topbar a, .topbar button { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+      #hud { font-size: 0.75rem; }
+      .hp-bar { width: 120px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="../games.html">&larr; Back</a>
+    <h1>The Arena</h1>
+    <button id="reset-btn" title="Erase your saved progress and start over">Reset Save</button>
+  </div>
+
+  <div class="stage">
+    <div class="canvas-wrap">
+      <canvas id="arena" width="960" height="600"></canvas>
+      <div id="hud">
+        <div class="hud-block">
+          <div id="loc-label">Half-Blood Hill</div>
+          <div style="font-size:0.72rem;color:var(--muted);" id="hp-label">HP 100/100</div>
+          <div class="hp-bar"><div class="hp-fill" id="hp-fill" style="width:100%;"></div></div>
+        </div>
+        <div class="hud-block" style="text-align:right;">
+          <div><span style="color:var(--muted);">Weapon:</span> <span id="weapon-label">Bronze Dagger</span></div>
+          <div style="font-size:0.72rem;color:var(--muted);">Special: <span class="special-pip" id="special-pip"></span></div>
+        </div>
+      </div>
+      <div id="toast-stack"></div>
+      <div id="overlay"><div class="panel" id="overlay-panel"></div></div>
+    </div>
+  </div>
+
+  <div class="help">
+    <strong>Controls:</strong>
+    <kbd>WASD</kbd> / <kbd>Arrows</kbd> move &nbsp;·&nbsp;
+    <kbd>Space</kbd> attack &nbsp;·&nbsp;
+    <kbd>Shift</kbd> inventory &nbsp;·&nbsp;
+    <kbd>Enter</kbd> special (heal 30HP) &nbsp;·&nbsp;
+    <kbd>Esc</kbd> leave area / close menu
+    <br>
+    <span style="font-size:0.78rem;">Walk onto a glowing location to enter it. Defeat monsters to unlock heroes and items. Your progress saves automatically.</span>
+  </div>
+
+  <script src="arena.js" defer></script>
+</body>
+</html>
