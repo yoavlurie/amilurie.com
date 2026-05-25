@@ -428,12 +428,8 @@ function openDialog(opts) {
   });
 }
 function openShop(id) {
+  if (id === "bighouse") { openChiron(); return; }
   const shops = {
-    bighouse: { title:"Big House — Chiron's Provisions", lines:["Chiron offers supplies."], items:[
-      { label:"Heal 30 HP", run:()=>{ heal(30); toast("+30 HP","good"); }},
-      { label:"Heal to Full", run:()=>{ G.player.hp = G.player.maxHp; toast("Healed.","good"); save(); }},
-      { label:"Talk to Chiron (Quests)", run:openChiron },
-    ]},
     mars:    { title:"Temple of Mars", lines:["Roman steel rests on the altar."], items:[ { label:"Take Pilum (Spear of Ares)", run:()=>{ addWeapon("c5"); toast("Acquired Spear of Ares.","good"); }} ]},
     forge:   { title:"Hephaestus' Forge", lines:["Celestial bronze edge."], items:[ { label:"Take Gold Sword", run:()=>{ addWeapon("gold"); toast("Acquired Gold Sword.","good"); }} ]},
   };
@@ -449,16 +445,148 @@ function openShop(id) {
   });
   document.getElementById("leave").onclick = closeOverlay;
 }
+
+// ===== CHIRON CONVERSATION =====
 function openChiron() {
-  const p = G.player; const choices = [];
+  const p = G.player;
+  const greeting = p._talkedToChiron
+    ? "\"Back so soon, hero? What troubles you?\""
+    : "\"Welcome to Camp Half-Blood, young one. I am Chiron — trainer of heroes since before your great-grandfather drew breath. How may I help you?\"";
+  p._talkedToChiron = true;
+
+  openDialog({
+    title: "Chiron, Trainer of Heroes",
+    text: greeting,
+    choices: [
+      { label: "Tell me about a quest", onClick: chironQuests },
+      { label: "I need advice — what should I do next?", onClick: chironAdvice },
+      { label: "Tell me about the gods and this camp", onClick: chironLore },
+      { label: "I need healing", onClick: chironHeal },
+      { label: "Goodbye", onClick: () => toast("\"Stay sharp, hero.\"", "info") },
+    ],
+  });
+}
+
+function chironQuests() {
+  const p = G.player;
+  const choices = [];
+  let intro = "\"The Fates whisper of three trials. ";
+  const available = Object.keys(QUESTS).filter(k => p.quests[k] === "available").length;
+  const inProgress = Object.keys(QUESTS).filter(k => p.quests[k] === "inprogress").length;
+  const done = Object.keys(QUESTS).filter(k => p.quests[k] === "complete").length;
+  if (done === 3) intro += "And you have completed them all — a true hero of Olympus.\"";
+  else if (inProgress > 0) intro += `You are mid-quest. Finish what you began, then return.\"`;
+  else if (available === 3) intro += "Choose one — but choose wisely.\"";
+  else intro += "Which calls to you?\"";
+
   Object.keys(QUESTS).forEach(qk => {
     const q = QUESTS[qk]; const s = p.quests[qk];
-    if (s === "available") choices.push({ label:`Accept: ${q.name}`, onClick:()=>{ p.quests[qk]="inprogress"; save(); toast(`Quest started: ${q.name}`,"info"); }});
-    else if (s === "inprogress") choices.push({ label:`In progress: ${q.name}`, onClick:()=>toast("Already on it.","info") });
-    else choices.push({ label:`✓ ${q.name}`, onClick:()=>toast("Quest complete.","good") });
+    if (s === "available") {
+      choices.push({ label: `► Accept: ${q.name}`, onClick: () => {
+        p.quests[qk] = "inprogress"; save();
+        openDialog({
+          title: "Chiron",
+          text: `"${q.desc}\n\nThe reward, should you succeed: ${q.reward}\n\nGo with the gods' blessing, hero."`,
+          choices: [
+            { label: "I will not fail.", onClick: () => toast(`Quest started: ${q.name}`, "good") },
+            { label: "Tell me more about your other quests", onClick: chironQuests },
+          ],
+        });
+      }});
+    } else if (s === "inprogress") {
+      choices.push({ label: `… In progress: ${q.name}`, onClick: () => openDialog({
+        title: "Chiron",
+        text: `"You're already chasing this one: ${q.desc}\n\nReturn when it's done."`,
+        choices: [
+          { label: "Where do I go again?", onClick: () => { toast(chironQuestHint(qk), "info"); }},
+          { label: "Back to Chiron", onClick: openChiron },
+        ],
+      })});
+    } else {
+      choices.push({ label: `✓ ${q.name} — complete`, onClick: () => toast("\"Well done, hero.\"", "good") });
+    }
   });
-  choices.push({ label:"Leave", onClick:()=>{} });
-  openDialog({ title:"Chiron", text:"\"Hero, the Fates are restless. Three quests need a champion. Which will you take?\"", choices });
+  choices.push({ label: "Back", onClick: openChiron });
+  openDialog({ title: "Chiron — Quests", text: intro, choices });
+}
+
+function chironQuestHint(qk) {
+  return {
+    bolt:    "The Master Bolt is hidden in the Underworld. Find an entrance — Central Park, D.O.A. Studio, or the Palace of Hades itself.",
+    fleece:  "The Fleece is on Polyphemus's island — sail from Long Island Sound to the Sea of Monsters.",
+    artemis: "Atlas waits on Mount Tam, in L.A. Bring your strongest weapon.",
+  }[qk] || "Trust your instincts, hero.";
+}
+
+function chironAdvice() {
+  const p = G.player;
+  let advice;
+  if (p.weapons.length < 3) {
+    advice = "\"You're under-armed. Visit the twelve cabins of Camp Half-Blood — each holds a weapon blessed by a god. The Bolt of Zeus and the War Hammer of Hephaestus hit hardest. Apollo's bow has range. Pick what suits your style.\"";
+  } else if (p.characters.length === 0) {
+    advice = "\"Train alongside heroes. The first ally you can earn is Tyson — sail to Poseidon's Palace at Long Island Sound and defeat the sharks. He will fight beside you.\"";
+  } else if (!p.achievements.includes("citySlicker")) {
+    advice = "\"Manhattan teems with monsters and allies. Mrs. Dodds haunts the MET. Hellhounds prowl the Williamsburg Bridge. And the Empire State Building hides the entrance to Olympus.\"";
+  } else if (!p.achievements.includes("ghostKing")) {
+    advice = "\"You should walk the Underworld. Hades is wrathful, but his realm holds answers — and Nico, the Ghost King, will join you if you earn his trust.\"";
+  } else if (!p.flags.fleece && p.quests.fleece !== "complete") {
+    advice = "\"The Golden Fleece can heal even mortal wounds. Polyphemus guards it. Take the Bow of Apollo if the Sirens lie in your path.\"";
+  } else if (p.monsterKills < 10) {
+    advice = "\"Combat sharpens a hero. The Myrmekes lair in our own camp is a fair warm-up — fast kills, low risk.\"";
+  } else {
+    advice = "\"You have already done much. Few heroes survive Tartarus. If you would prove yourself fully, the Doors of Death await sealing.\"";
+  }
+  openDialog({
+    title: "Chiron",
+    text: advice,
+    choices: [
+      { label: "Anything else?", onClick: openChiron },
+      { label: "Thank you, Chiron.", onClick: () => toast("\"Walk in glory, hero.\"", "good") },
+    ],
+  });
+}
+
+function chironLore() {
+  openDialog({
+    title: "Chiron",
+    text: "\"What do you wish to know?\"",
+    choices: [
+      { label: "Camp Half-Blood", onClick: () => openDialog({
+        title: "Chiron",
+        text: "\"This camp is the only safe haven for demigods in the mortal world. Twelve cabins, one for each Olympian. The arena builds your steel; the Big House mends your wounds. The Myrmekes — giant ants — nest just beyond the trees. Useful practice for greener heroes.\"",
+        choices: [{ label: "Back", onClick: chironLore }, { label: "Goodbye", onClick: () => toast("\"Farewell.\"", "info") }],
+      })},
+      { label: "The gods of Olympus", onClick: () => openDialog({
+        title: "Chiron",
+        text: "\"Zeus rules the sky. Poseidon, the sea. Hades, the dead — though he refuses a throne on Olympus. Ares delights in war; Athena in strategy; Apollo in light and prophecy. Each god claims children in the mortal world. You are one. Their gifts, you'll find inside their cabins.\"",
+        choices: [{ label: "Back", onClick: chironLore }, { label: "Goodbye", onClick: () => toast("\"Farewell.\"", "info") }],
+      })},
+      { label: "Camp Jupiter and the Romans", onClick: () => openDialog({
+        title: "Chiron",
+        text: "\"In the West, Jupiter's children train as legionnaires. They favor discipline and the Pilum. Octavian, their augur, reads omens in stuffed animals. Take his advice with a great deal of salt. Hazel Levesque can be earned in their Field of Mars.\"",
+        choices: [{ label: "Back", onClick: chironLore }, { label: "Goodbye", onClick: () => toast("\"Farewell.\"", "info") }],
+      })},
+      { label: "The Underworld", onClick: () => openDialog({
+        title: "Chiron",
+        text: "\"Three doors lead down: Central Park, D.O.A. Studio in L.A., or your own foolish curiosity. Cerberus guards the Styx. Thanatos can freeze even an immortal. And Hades… try reasoning first. Killing him is harder than it sounds.\"",
+        choices: [{ label: "Back", onClick: chironLore }, { label: "Goodbye", onClick: () => toast("\"Farewell.\"", "info") }],
+      })},
+      { label: "Back", onClick: openChiron },
+    ],
+  });
+}
+
+function chironHeal() {
+  const p = G.player;
+  openDialog({
+    title: "Chiron — Provisions",
+    text: `"You stand at ${Math.round(p.hp)}/${p.maxHp} HP. Take what you need."`,
+    choices: [
+      { label: "Nectar — heal 30 HP", onClick: () => { heal(30); toast("+30 HP", "good"); save(); }},
+      { label: "Ambrosia — heal to full", onClick: () => { p.hp = p.maxHp; toast("Fully healed.", "good"); save(); }},
+      { label: "Back", onClick: openChiron },
+    ],
+  });
 }
 
 // ===== UNLOCKS =====
