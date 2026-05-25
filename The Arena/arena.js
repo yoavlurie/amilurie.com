@@ -1,78 +1,87 @@
 /* ============================================================
-   The Arena — real-time demigod action RPG (tile + interiors)
+   The Arena — first-person 3D demigod action RPG
    ============================================================ */
 (function () {
 "use strict";
 
 // ===== CONFIG =====
 const W = 960, H = 600;
-const TS = 32; // tile size
-const PLAYER_SPEED = 170;
+const FOV = Math.PI / 2.5;                   // 72°
+const HALF_FOV = FOV / 2;
+const PROJ = (W / 2) / Math.tan(HALF_FOV);   // perspective projection plane distance
+const RAY_STEP = 2;                           // sample every N pixels horizontally
+const NUM_RAYS = Math.ceil(W / RAY_STEP);
+const WALL_TALL = 60;                         // world-units tall
+const PLAYER_R = 10;                          // player collision radius
+const MOVE_SPEED = 130;                       // world units / sec
+const TURN_SPEED = 2.8;                       // rad / sec
+const WORLD_SCALE = 2;                        // multiplier for MAP coordinates
 
 // ===== WEAPONS =====
 const WEAPONS = {
-  bronze:   { name: "Bronze Dagger",      dmg: 8,  reach: 28, cd: 0.32 },
-  c1:       { name: "Bolt of Zeus",        dmg: 18, reach: 38, cd: 0.45 },
-  c2:       { name: "Sacred Mace (Hera)",  dmg: 11, reach: 30, cd: 0.32 },
-  c3:       { name: "Riptide (Poseidon)",  dmg: 16, reach: 34, cd: 0.32 },
-  c4:       { name: "Sickle (Demeter)",    dmg: 12, reach: 30, cd: 0.30 },
-  c5:       { name: "Spear of Ares",       dmg: 15, reach: 40, cd: 0.40 },
-  c6:       { name: "Owl Blade (Athena)",  dmg: 13, reach: 32, cd: 0.28 },
-  c7:       { name: "Bow of Apollo",       dmg: 12, reach: 220, cd: 0.45, ranged: true },
-  c8:       { name: "Hunters' Knife (Artemis)", dmg: 14, reach: 30, cd: 0.26 },
-  c9:       { name: "War Hammer (Hephaestus)",  dmg: 20, reach: 36, cd: 0.55 },
-  c10:      { name: "Charm Dagger (Aphrodite)", dmg: 10, reach: 28, cd: 0.24 },
-  c11:      { name: "Caduceus (Hermes)",   dmg: 11, reach: 30, cd: 0.22 },
-  c12:      { name: "Vine Whip (Dionysus)", dmg: 12, reach: 42, cd: 0.35 },
-  gold:     { name: "Gold Sword",           dmg: 24, reach: 38, cd: 0.32 },
+  bronze: { name: "Bronze Dagger", dmg: 8,  reach: 60,  cd: 0.32 },
+  c1:     { name: "Bolt of Zeus", dmg: 18, reach: 90,  cd: 0.45 },
+  c2:     { name: "Sacred Mace (Hera)", dmg: 11, reach: 65, cd: 0.32 },
+  c3:     { name: "Riptide (Poseidon)", dmg: 16, reach: 80, cd: 0.32 },
+  c4:     { name: "Sickle (Demeter)", dmg: 12, reach: 70, cd: 0.30 },
+  c5:     { name: "Spear of Ares", dmg: 15, reach: 100, cd: 0.40 },
+  c6:     { name: "Owl Blade (Athena)", dmg: 13, reach: 70, cd: 0.28 },
+  c7:     { name: "Bow of Apollo", dmg: 12, reach: 400, cd: 0.45, ranged: true },
+  c8:     { name: "Hunters' Knife (Artemis)", dmg: 14, reach: 65, cd: 0.26 },
+  c9:     { name: "War Hammer (Hephaestus)", dmg: 20, reach: 80, cd: 0.55 },
+  c10:    { name: "Charm Dagger (Aphrodite)", dmg: 10, reach: 60, cd: 0.24 },
+  c11:    { name: "Caduceus (Hermes)", dmg: 11, reach: 65, cd: 0.22 },
+  c12:    { name: "Vine Whip (Dionysus)", dmg: 12, reach: 90, cd: 0.35 },
+  gold:   { name: "Gold Sword", dmg: 24, reach: 80, cd: 0.32 },
 };
 
 // ===== MONSTERS =====
+// shape: humanoid | beast | ghost | bug | cyclops | snake
 const MONSTERS = {
-  myrmeke:    { name: "Myrmeke",     level: 2, color: "#1a1a1a" },
-  shark:      { name: "Shark",       level: 3, color: "#7a8492" },
-  demigod:    { name: "Demigod",     level: 2, color: "#c0d860" },
-  mrsDodds:   { name: "Mrs. Dodds",  level: 2, color: "#666c78" },
-  empousa:    { name: "Empousa",     level: 4, color: "#e04848", note: "lures with charm" },
-  hyperion:   { name: "Hyperion",    level: 5, color: "#ff5020" },
-  hellhound:  { name: "Hellhound",   level: 3, color: "#1d1418" },
-  dracaena:   { name: "Dracaena",    level: 3, color: "#3a8a4a" },
-  laistry:    { name: "Laistrygonian Giant", level: 3, color: "#6b4422" },
-  chimera:    { name: "Chimera",     level: 6, color: "#8a8076" },
-  echidna:    { name: "Echidna",     level: 6, color: "#9a8276" },
-  medusa:     { name: "Medusa",      level: 5, color: "#5aa860" },
-  lotus:      { name: "Lotus Eater", level: 5, color: "#d090e0" },
-  atlas:      { name: "Atlas",       level: 7, color: "#8c8c8c" },
-  enceladus:  { name: "Enceladus",   level: 7, color: "#a06038" },
-  procrustes: { name: "Procrustes",  level: 3, color: "#7d7d7d" },
-  ghost:      { name: "Rogue Ghost", level: 3, color: "#c8d0e0" },
-  thanatos:   { name: "Thanatos",    level: 6, color: "#0a0a0a", note: "freezes 3s on hit" },
-  hades:      { name: "Hades",       level: 8, color: "#1a0a1a" },
-  fury:       { name: "Fury",        level: 6, color: "#404048" },
-  persephone: { name: "Persephone",  level: 6, color: "#a02030" },
-  charon:     { name: "Charon",      level: 6, color: "#1a1a1a" },
-  cerberus:   { name: "Cerberus",    level: 7, color: "#5a3a20" },
-  sheep:      { name: "Sheep",       level: 4, color: "#f0f0f0" },
-  polyphemus: { name: "Polyphemus",  level: 7, color: "#90897a" },
-  scylla:     { name: "Scylla",      level: 6, color: "#c84040" },
-  charybdis:  { name: "Charybdis",   level: 6, color: "#3060a0", note: "sucks you in" },
-  circe:      { name: "Circe",       level: 6, color: "#a060c0" },
-  siren:      { name: "Siren",       level: 6, color: "#9090a0" },
-  ares:       { name: "Ares",        level: 6, color: "#c02020" },
-  octavian:   { name: "Octavian",    level: 2, color: "#cfb98f" },
-  legion:     { name: "Roman Legionnaire", level: 3, color: "#a04030" },
+  myrmeke:    { name: "Myrmeke",     level: 2, color: "#1a1a1a", shape: "bug" },
+  shark:      { name: "Shark",       level: 3, color: "#7a8492", shape: "beast" },
+  demigod:    { name: "Demigod",     level: 2, color: "#c0d860", shape: "humanoid" },
+  mrsDodds:   { name: "Mrs. Dodds",  level: 2, color: "#666c78", shape: "humanoid" },
+  empousa:    { name: "Empousa",     level: 4, color: "#e04848", shape: "humanoid" },
+  hyperion:   { name: "Hyperion",    level: 5, color: "#ff5020", shape: "humanoid" },
+  hellhound:  { name: "Hellhound",   level: 3, color: "#1d1418", shape: "beast" },
+  dracaena:   { name: "Dracaena",    level: 3, color: "#3a8a4a", shape: "snake" },
+  laistry:    { name: "Laistrygonian Giant", level: 3, color: "#6b4422", shape: "humanoid" },
+  chimera:    { name: "Chimera",     level: 6, color: "#8a8076", shape: "beast" },
+  echidna:    { name: "Echidna",     level: 6, color: "#9a8276", shape: "snake" },
+  medusa:     { name: "Medusa",      level: 5, color: "#5aa860", shape: "humanoid" },
+  lotus:      { name: "Lotus Eater", level: 5, color: "#d090e0", shape: "humanoid" },
+  atlas:      { name: "Atlas",       level: 7, color: "#8c8c8c", shape: "humanoid" },
+  enceladus:  { name: "Enceladus",   level: 7, color: "#a06038", shape: "humanoid" },
+  procrustes: { name: "Procrustes",  level: 3, color: "#7d7d7d", shape: "humanoid" },
+  ghost:      { name: "Rogue Ghost", level: 3, color: "#c8d0e0", shape: "ghost" },
+  thanatos:   { name: "Thanatos",    level: 6, color: "#0a0a0a", shape: "humanoid", note: "freezes 3s on hit" },
+  hades:      { name: "Hades",       level: 8, color: "#1a0a1a", shape: "humanoid" },
+  fury:       { name: "Fury",        level: 6, color: "#404048", shape: "ghost" },
+  persephone: { name: "Persephone",  level: 6, color: "#a02030", shape: "humanoid" },
+  charon:     { name: "Charon",      level: 6, color: "#1a1a1a", shape: "humanoid" },
+  cerberus:   { name: "Cerberus",    level: 7, color: "#5a3a20", shape: "beast" },
+  sheep:      { name: "Sheep",       level: 4, color: "#f0f0f0", shape: "beast" },
+  polyphemus: { name: "Polyphemus",  level: 7, color: "#90897a", shape: "cyclops" },
+  scylla:     { name: "Scylla",      level: 6, color: "#c84040", shape: "snake" },
+  charybdis:  { name: "Charybdis",   level: 6, color: "#3060a0", shape: "ghost", note: "sucks you in" },
+  circe:      { name: "Circe",       level: 6, color: "#a060c0", shape: "humanoid" },
+  siren:      { name: "Siren",       level: 6, color: "#9090a0", shape: "humanoid" },
+  ares:       { name: "Ares",        level: 6, color: "#c02020", shape: "humanoid" },
+  octavian:   { name: "Octavian",    level: 2, color: "#cfb98f", shape: "humanoid" },
+  legion:     { name: "Roman Legionnaire", level: 3, color: "#a04030", shape: "humanoid" },
 };
 
 function statsFor(lv) {
   const table = {
-    1: { hp: 25,  dmg: 3,  speed: 95 },
-    2: { hp: 40,  dmg: 4,  speed: 105 },
-    3: { hp: 60,  dmg: 5,  speed: 110 },
-    4: { hp: 90,  dmg: 7,  speed: 115 },
-    5: { hp: 130, dmg: 9,  speed: 120 },
-    6: { hp: 180, dmg: 12, speed: 125 },
-    7: { hp: 240, dmg: 15, speed: 130 },
-    8: { hp: 330, dmg: 18, speed: 135 },
+    1: { hp: 25, dmg: 3, speed: 60 },
+    2: { hp: 40, dmg: 4, speed: 65 },
+    3: { hp: 60, dmg: 5, speed: 70 },
+    4: { hp: 90, dmg: 7, speed: 75 },
+    5: { hp: 130, dmg: 9, speed: 80 },
+    6: { hp: 180, dmg: 12, speed: 85 },
+    7: { hp: 240, dmg: 15, speed: 90 },
+    8: { hp: 330, dmg: 18, speed: 95 },
   };
   return table[lv] || table[3];
 }
@@ -105,295 +114,208 @@ const ACHIEVEMENTS = {
 };
 
 const QUESTS = {
-  bolt: {
-    name: "The Master Bolt",
-    desc: "Zeus's master bolt was stolen. Travel to the Underworld and retrieve it — Hades is the prime suspect.",
-    reward: "A gold sword.",
-  },
-  fleece: {
-    name: "The Golden Fleece",
-    desc: "Sail to the Sea of Monsters and steal the Golden Fleece from Polyphemus's island.",
-    reward: "The Golden Fleece (heals on use).",
-  },
-  artemis: {
-    name: "Free Artemis",
-    desc: "Atlas has tricked Artemis into bearing the sky. Defeat Atlas on Mount Tam.",
-    reward: "A boar mount that fights and defends you.",
-  },
-};
-
-// ===== TILE STYLES per map =====
-// Each tile style returns a color for a tile at (col, row) using a simple hash.
-function tileHash(c, r) { return ((c * 73856093) ^ (r * 19349663)) >>> 0; }
-const TILE_STYLES = {
-  grass:    (c, r) => ["#5a8a3a","#658f3f","#557f35","#618c3b","#598a39"][tileHash(c,r) % 5],
-  sand:     (c, r) => ["#d4b06a","#c8a05a","#dfb872","#cda863","#d8b070"][tileHash(c,r) % 5],
-  pavement: (c, r) => ["#7a7a82","#85858d","#6e6e76","#7d7d85","#80808a"][tileHash(c,r) % 5],
-  city:     (c, r) => ["#4a4a58","#525261","#3f3f4d","#494957","#525261"][tileHash(c,r) % 5],
-  cave:     (c, r) => ["#2a1d2d","#321e30","#241827","#2c1d2d","#3a2230"][tileHash(c,r) % 5],
-  water:    (c, r) => ["#3a78b0","#3170a8","#4a82b8","#3974ac","#3478b0"][tileHash(c,r) % 5],
-  cloud:    (c, r) => ["#dde4ff","#e2e9ff","#d6dff8","#e6ecff","#dee7ff"][tileHash(c,r) % 5],
-  shadow:   (c, r) => ["#1a0710","#220a18","#180510","#1f0814","#1a0712"][tileHash(c,r) % 5],
-  wood:     (c, r) => ["#8a5a30","#80522a","#90603a","#7a4d28","#88582e"][tileHash(c,r) % 5],
-  stone:    (c, r) => ["#6e6e6e","#787878","#666666","#727272","#6a6a6a"][tileHash(c,r) % 5],
-  arena:    (c, r) => ["#b8843c","#a87836","#c0883e","#ad7c38","#b27e3a"][tileHash(c,r) % 5],
-  marble:   (c, r) => ["#e8e6dd","#dad6c8","#e2dfd4","#d6d2c4","#e0dcd0"][tileHash(c,r) % 5],
-  // overworld: per-region colors
-  overworld: (c, r) => {
-    const x = c * TS, y = r * TS;
-    // 3x2 region grid
-    const reg = (y < H/2 ? 0 : 1) * 3 + (x < W/3 ? 0 : (x < 2*W/3 ? 1 : 2));
-    const palettes = [
-      ["#5a8a3a","#658f3f","#557f35","#618c3b"], // 0: camp-hb area
-      ["#3a78b0","#3170a8","#4a82b8","#3974ac"], // 1: long island
-      ["#c89a5a","#b88c4a","#d0a062","#c2954e"], // 2: camp jupiter
-      ["#5e5e6e","#666674","#54545f","#5a5a68"], // 3: manhattan
-      ["#d4a847","#c89c3a","#dab050","#c89e3c"], // 4: vegas
-      ["#d4664a","#c8583c","#dc6e54","#c85940"], // 5: l.a.
-    ];
-    const p = palettes[reg];
-    return p[tileHash(c, r) % p.length];
-  },
+  bolt:    { name: "The Master Bolt",  desc: "Zeus's master bolt was stolen. Travel to the Underworld and retrieve it.", reward: "Gold Sword." },
+  fleece:  { name: "The Golden Fleece", desc: "Sail to the Sea of Monsters and steal the Golden Fleece.",                reward: "Golden Fleece (heal)." },
+  artemis: { name: "Free Artemis",      desc: "Atlas tricked Artemis into bearing the sky. Defeat Atlas on Mt. Tam.",    reward: "Boar mount." },
 };
 
 // ===== MAPS =====
-function pos(x, y, w, h) { return { x, y, w, h }; }
+// pos() scales source coords up so the world is bigger than the screen.
+function pos(x, y, w, h) { return { x: x * WORLD_SCALE, y: y * WORLD_SCALE, w: w * WORLD_SCALE, h: h * WORLD_SCALE }; }
+function sp(x, y) { return { x: x * WORLD_SCALE, y: y * WORLD_SCALE }; }
 
 const MAPS = {
-  // ============ MAIN OVERWORLD ============
   main: {
-    label: "The World",
-    tileStyle: "overworld",
-    spawn: { x: 480, y: 320 },
+    label: "The World", tileStyle: "overworld",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "camp-hb",     name: "Camp Half-Blood",   outdoor: true, ...pos( 40,  40, 240, 200), color: "#a8c97e", action: { type: "goto", to: "camp-hb" } },
-      { id: "long-island", name: "Long Island Sound", outdoor: true, ...pos(360,  40, 240, 200), color: "#5a93c8", action: { type: "goto", to: "long-island" } },
-      { id: "camp-j",      name: "Camp Jupiter",      outdoor: true, ...pos(680,  40, 240, 200), color: "#c89a5a", action: { type: "goto", to: "camp-j", achievement: "newRome" } },
-      { id: "manhattan",   name: "Manhattan",         outdoor: true, ...pos( 40, 360, 240, 200), color: "#7e7e8c", action: { type: "goto", to: "manhattan", achievement: "citySlicker" } },
-      { id: "vegas",       name: "Las Vegas",         outdoor: true, ...pos(360, 360, 240, 200), color: "#d4a847", action: { type: "goto", to: "vegas" } },
-      { id: "la",          name: "L.A.",              outdoor: true, ...pos(680, 360, 240, 200), color: "#e08068", action: { type: "goto", to: "la" } },
+      { id:"camp-hb",     name:"Camp Half-Blood",   outdoor:true, ...pos( 40,  40, 240, 200), color:"#a8c97e", action:{ type:"goto", to:"camp-hb" } },
+      { id:"long-island", name:"Long Island Sound", outdoor:true, ...pos(360,  40, 240, 200), color:"#5a93c8", action:{ type:"goto", to:"long-island" } },
+      { id:"camp-j",      name:"Camp Jupiter",      outdoor:true, ...pos(680,  40, 240, 200), color:"#c89a5a", action:{ type:"goto", to:"camp-j", achievement:"newRome" } },
+      { id:"manhattan",   name:"Manhattan",         outdoor:true, ...pos( 40, 360, 240, 200), color:"#7e7e8c", action:{ type:"goto", to:"manhattan", achievement:"citySlicker" } },
+      { id:"vegas",       name:"Las Vegas",         outdoor:true, ...pos(360, 360, 240, 200), color:"#d4a847", action:{ type:"goto", to:"vegas" } },
+      { id:"la",          name:"L.A.",              outdoor:true, ...pos(680, 360, 240, 200), color:"#e08068", action:{ type:"goto", to:"la" } },
     ],
   },
-
-  // ============ CAMP HALF-BLOOD ============
   "camp-hb": {
-    label: "Camp Half-Blood",
-    parent: "main",
-    tileStyle: "grass",
-    spawn: { x: 480, y: 540 },
+    label: "Camp Half-Blood", parent: "main", tileStyle: "grass",
+    spawn: sp(480, 540),
     subzones: [
       ...Array.from({ length: 12 }, (_, i) => {
-        const row = Math.floor(i / 6);
-        const col = i % 6;
-        const gx = 40 + col * 150;
-        const gy = 30 + row * 110;
+        const row = Math.floor(i / 6), col = i % 6;
         const cabinNames = ["Zeus","Hera","Poseidon","Demeter","Ares","Athena","Apollo","Artemis","Hephaestus","Aphrodite","Hermes","Dionysus"];
         const cabinColors = ["#fff7a8","#dfd0ff","#9bd0f0","#d8ef9b","#f09898","#e8e0b8","#fff0a0","#d0e8ff","#d4a070","#ffc8d8","#d0d0d0","#b88dd0"];
         return {
-          id: `cabin${i+1}`,
-          name: `Cabin ${i+1}: ${cabinNames[i]}`,
-          x: gx, y: gy, w: 110, h: 70,
-          color: cabinColors[i],
-          interior: "cabin",
+          id: `cabin${i+1}`, name: `Cabin ${i+1}: ${cabinNames[i]}`,
+          ...pos(40 + col * 150, 30 + row * 110, 110, 70),
+          color: cabinColors[i], interior: "cabin",
           action: { type: "cabin", weapon: `c${i+1}`, label: cabinNames[i] },
         };
       }),
-      { id: "arena",     name: "Arena",         ...pos(360, 380, 200, 130), color: "#c98a4a", interior: "arena",    action: { type: "arena" } },
-      { id: "bighouse",  name: "Big House",     ...pos( 60, 380, 200, 130), color: "#854a2a", interior: "bighouse", action: { type: "bighouse" } },
-      { id: "myrmekes",  name: "Myrmekes Lair", ...pos(680, 380, 200, 130), color: "#2a2a2a", interior: "lair",     action: { type: "fight", mons: ["myrmeke","myrmeke","myrmeke"], reward: "First Blood" } },
+      { id:"arena",    name:"Arena",         ...pos(360, 380, 200, 130), color:"#c98a4a", interior:"arena",    action:{ type:"arena" } },
+      { id:"bighouse", name:"Big House",     ...pos( 60, 380, 200, 130), color:"#854a2a", interior:"bighouse", action:{ type:"bighouse" } },
+      { id:"myrmekes", name:"Myrmekes Lair", ...pos(680, 380, 200, 130), color:"#2a2a2a", interior:"lair",     action:{ type:"fight", mons:["myrmeke","myrmeke","myrmeke"] } },
     ],
   },
-
-  // ============ LONG ISLAND SOUND ============
   "long-island": {
-    label: "Long Island Sound",
-    parent: "main",
-    tileStyle: "water",
-    spawn: { x: 480, y: 540 },
+    label: "Long Island Sound", parent: "main", tileStyle: "water",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "som-portal", name: "Sea of Monsters →",  ...pos( 80, 70, 280, 180), color: "#5aa8d8", interior: "portal", action: { type: "goto", to: "sea-of-monsters" } },
-      { id: "poseidon",   name: "Poseidon's Palace",  ...pos(600, 70, 280, 180), color: "#7ac8f0", interior: "palace", action: { type: "fight", mons: ["shark","shark"], unlock: "tyson", reqInfo: "Defeat the sharks to unlock Tyson." } },
+      { id:"som-portal", name:"Sea of Monsters →", ...pos( 80, 70, 280, 180), color:"#5aa8d8", interior:"portal", action:{ type:"goto", to:"sea-of-monsters" } },
+      { id:"poseidon",   name:"Poseidon's Palace", ...pos(600, 70, 280, 180), color:"#7ac8f0", interior:"palace", action:{ type:"fight", mons:["shark","shark"], unlock:"tyson", reqInfo:"Defeat the sharks to unlock Tyson." } },
     ],
   },
-
-  // ============ CAMP JUPITER ============
   "camp-j": {
-    label: "Camp Jupiter",
-    parent: "main",
-    tileStyle: "sand",
-    spawn: { x: 480, y: 540 },
+    label: "Camp Jupiter", parent: "main", tileStyle: "sand",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "temple-j",   name: "Temple of Jupiter", ...pos( 60,  60, 220, 140), color: "#e8c068", interior: "temple", action: { type: "dialog", id: "octavian" } },
-      { id: "temple-m",   name: "Temple of Mars",    ...pos(360,  60, 240, 140), color: "#c84040", interior: "temple", action: { type: "shop", id: "mars" } },
-      { id: "field-mars", name: "Field of Mars",     ...pos(680,  60, 220, 140), color: "#8a4030", interior: "fortress", action: { type: "fight", mons: ["legion","legion","legion","legion"], unlock: "hazel", reqInfo: "Invade the fortress to unlock Hazel." } },
-      { id: "mess",       name: "Mess Hall",         ...pos(360, 380, 240, 140), color: "#d4b878", interior: "mess",  action: { type: "heal", amount: "full", msg: "You eat your fill. Fully healed." } },
+      { id:"temple-j",   name:"Temple of Jupiter", ...pos( 60,  60, 220, 140), color:"#e8c068", interior:"temple",   action:{ type:"dialog", id:"octavian" } },
+      { id:"temple-m",   name:"Temple of Mars",    ...pos(360,  60, 240, 140), color:"#c84040", interior:"temple",   action:{ type:"shop",   id:"mars" } },
+      { id:"field-mars", name:"Field of Mars",     ...pos(680,  60, 220, 140), color:"#8a4030", interior:"fortress", action:{ type:"fight",  mons:["legion","legion","legion","legion"], unlock:"hazel", reqInfo:"Invade the fortress to unlock Hazel." } },
+      { id:"mess",       name:"Mess Hall",         ...pos(360, 380, 240, 140), color:"#d4b878", interior:"mess",     action:{ type:"heal",   amount:"full", msg:"You eat your fill. Fully healed." } },
     ],
   },
-
-  // ============ MANHATTAN ============
-  "manhattan": {
-    label: "Manhattan",
-    parent: "main",
-    tileStyle: "city",
-    spawn: { x: 480, y: 540 },
+  manhattan: {
+    label: "Manhattan", parent: "main", tileStyle: "city",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "central-park", name: "Central Park",    ...pos( 30,  30, 200, 120), color: "#7ea860", interior: "portal", action: { type: "goto", to: "underworld", achievement: "ghostKing", msg: "You found the hidden entrance to the Underworld." } },
-      { id: "met",          name: "The MET",         ...pos( 30, 170, 200, 120), color: "#a09078", interior: "museum", action: { type: "fight", mons: ["mrsDodds"], unlock: "selina", reqInfo: "Defeat Mrs. Dodds to unlock Selina." } },
-      { id: "plaza",        name: "The Plaza",       ...pos(260,  30, 200, 120), color: "#c8a060", interior: "hotel",  action: { type: "fight", mons: ["empousa"], grant: "automatons", reqInfo: "Defeat the Empousa to summon the automatons." } },
-      { id: "grand-central",name: "Grand Central",   ...pos(260, 170, 200, 120), color: "#9c8a60", interior: "station",action: { type: "fight", mons: ["hyperion"], allyIfFlag: "automatons", allyMons: "demigod", reqInfo: "Defeat Hyperion. Defeated Empousa? Hermes statue helps." } },
-      { id: "wmbridge",     name: "Williamsburg Br.",...pos(490,  30, 200, 120), color: "#6a6a78", interior: "bridge", action: { type: "fight", mons: ["hellhound","hellhound","hellhound","hellhound","hellhound"], packBonus: true, unlock: "mrsOleary", reqInfo: "Win to befriend Mrs. O'Leary." } },
-      { id: "meriwether",   name: "Meriwether Prep", ...pos(490, 170, 200, 120), color: "#a89868", interior: "school", action: { type: "fight", mons: ["laistry","laistry","laistry"], unlock: "rachel", reqInfo: "Defeat the Giants to unlock Rachel." } },
-      { id: "library",      name: "NY Public Library",...pos(720, 30, 210, 120), color: "#b89870", interior: "library",action: { type: "fight", mons: ["dracaena","dracaena","dracaena"], packBonus: true, allyIfFlag: "automatons", unlock: "beckendorf", reqInfo: "Have automatons? The lion statue will help. Unlocks Beckendorf." } },
-      { id: "esb",          name: "Empire State Bldg",...pos(720,170, 210, 120), color: "#7080a0", interior: "portal", action: { type: "goto", to: "olympus", achievement: "ascension" } },
+      { id:"central-park", name:"Central Park",       ...pos( 30,  30, 200, 120), color:"#7ea860", interior:"portal",  action:{ type:"goto",  to:"underworld", achievement:"ghostKing", msg:"You found the hidden entrance to the Underworld." } },
+      { id:"met",          name:"The MET",            ...pos( 30, 170, 200, 120), color:"#a09078", interior:"museum",  action:{ type:"fight", mons:["mrsDodds"], unlock:"selina", reqInfo:"Defeat Mrs. Dodds to unlock Selina." } },
+      { id:"plaza",        name:"The Plaza",          ...pos(260,  30, 200, 120), color:"#c8a060", interior:"hotel",   action:{ type:"fight", mons:["empousa"], grant:"automatons", reqInfo:"Defeat the Empousa to summon the automatons." } },
+      { id:"grand-central",name:"Grand Central",      ...pos(260, 170, 200, 120), color:"#9c8a60", interior:"station", action:{ type:"fight", mons:["hyperion"], allyIfFlag:"automatons", reqInfo:"Defeat Hyperion. Defeated Empousa? Hermes statue helps." } },
+      { id:"wmbridge",     name:"Williamsburg Br.",   ...pos(490,  30, 200, 120), color:"#6a6a78", interior:"bridge",  action:{ type:"fight", mons:["hellhound","hellhound","hellhound","hellhound","hellhound"], packBonus:true, unlock:"mrsOleary", reqInfo:"Win to befriend Mrs. O'Leary." } },
+      { id:"meriwether",   name:"Meriwether Prep",    ...pos(490, 170, 200, 120), color:"#a89868", interior:"school",  action:{ type:"fight", mons:["laistry","laistry","laistry"], unlock:"rachel", reqInfo:"Defeat the Giants to unlock Rachel." } },
+      { id:"library",      name:"NY Public Library",  ...pos(720,  30, 210, 120), color:"#b89870", interior:"library", action:{ type:"fight", mons:["dracaena","dracaena","dracaena"], packBonus:true, allyIfFlag:"automatons", unlock:"beckendorf", reqInfo:"Lion statue helps if you have automatons. Unlocks Beckendorf." } },
+      { id:"esb",          name:"Empire State Bldg",  ...pos(720, 170, 210, 120), color:"#7080a0", interior:"portal",  action:{ type:"goto",  to:"olympus", achievement:"ascension" } },
     ],
   },
-
-  // ============ LAS VEGAS ============
-  "vegas": {
-    label: "Las Vegas",
-    parent: "main",
-    tileStyle: "sand",
-    spawn: { x: 480, y: 540 },
+  vegas: {
+    label: "Las Vegas", parent: "main", tileStyle: "sand",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "arch",      name: "Gateway Arch",     ...pos( 60,  60, 240, 240), color: "#b8b8b8", interior: "arch",     action: { type: "fight", mons: ["chimera","echidna"], unlock: "frank", reqInfo: "Defeat Chimera & Echidna to unlock Frank." } },
-      { id: "garden",    name: "Auntie Em's",      ...pos(360,  60, 240, 240), color: "#7aa84a", interior: "garden",   action: { type: "fight", mons: ["medusa"], unlock: "grover", reqInfo: "Defeat Medusa to unlock Grover." } },
-      { id: "lotus",     name: "Lotus Hotel",      ...pos(660,  60, 240, 240), color: "#e0a8d8", interior: "hotel",    action: { type: "fight", mons: Array(10).fill("lotus"), unlock: "piper", reqInfo: "Win against 10 lotus eaters to unlock Piper." } },
+      { id:"arch",   name:"Gateway Arch", ...pos( 60, 60, 240, 240), color:"#b8b8b8", interior:"arch",  action:{ type:"fight", mons:["chimera","echidna"], unlock:"frank", reqInfo:"Defeat Chimera & Echidna to unlock Frank." } },
+      { id:"garden", name:"Auntie Em's",  ...pos(360, 60, 240, 240), color:"#7aa84a", interior:"garden", action:{ type:"fight", mons:["medusa"], unlock:"grover", reqInfo:"Defeat Medusa to unlock Grover." } },
+      { id:"lotus",  name:"Lotus Hotel",  ...pos(660, 60, 240, 240), color:"#e0a8d8", interior:"hotel",  action:{ type:"fight", mons:Array(10).fill("lotus"), unlock:"piper", reqInfo:"Win against 10 lotus eaters to unlock Piper." } },
     ],
   },
-
-  // ============ L.A. ============
-  "la": {
-    label: "L.A.",
-    parent: "main",
-    tileStyle: "pavement",
-    spawn: { x: 480, y: 540 },
+  la: {
+    label: "L.A.", parent: "main", tileStyle: "pavement",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "mt-tam",     name: "Mount Tam",                ...pos( 30,  60, 220, 240), color: "#8c8c8c", interior: "mountain", action: { type: "fight", mons: ["atlas"], unlock: "annabeth", quest: "artemis", reqInfo: "Defeat Atlas to free Artemis and unlock Annabeth." } },
-      { id: "mt-diablo",  name: "Mount Diablo",             ...pos(280,  60, 220, 240), color: "#a04030", interior: "mountain", action: { type: "fight", mons: ["enceladus"], unlock: "leo", reqInfo: "Defeat Enceladus to unlock Leo." } },
-      { id: "crusty",     name: "Crusty's Waterbed Palace", ...pos(530,  60, 200, 240), color: "#aaa",    interior: "shop",     action: { type: "fight", mons: ["procrustes"], unlock: "bianca", reqInfo: "Defeat Procrustes to unlock Bianca." } },
-      { id: "doa",        name: "D.O.A. Studio",            ...pos(760,  60, 170, 240), color: "#1a1a1a", interior: "portal",   action: { type: "goto", to: "underworld", achievement: "ghostKing" } },
+      { id:"mt-tam",    name:"Mount Tam",                ...pos( 30, 60, 220, 240), color:"#8c8c8c", interior:"mountain", action:{ type:"fight", mons:["atlas"],     unlock:"annabeth", quest:"artemis", reqInfo:"Defeat Atlas to free Artemis and unlock Annabeth." } },
+      { id:"mt-diablo", name:"Mount Diablo",             ...pos(280, 60, 220, 240), color:"#a04030", interior:"mountain", action:{ type:"fight", mons:["enceladus"], unlock:"leo", reqInfo:"Defeat Enceladus to unlock Leo." } },
+      { id:"crusty",    name:"Crusty's Waterbed Palace", ...pos(530, 60, 200, 240), color:"#aaa",    interior:"shop",     action:{ type:"fight", mons:["procrustes"], unlock:"bianca", reqInfo:"Defeat Procrustes to unlock Bianca." } },
+      { id:"doa",       name:"D.O.A. Studio",            ...pos(760, 60, 170, 240), color:"#1a1a1a", interior:"portal",   action:{ type:"goto",  to:"underworld",   achievement:"ghostKing" } },
     ],
   },
-
-  // ============ UNDERWORLD ============
-  "underworld": {
-    label: "The Underworld",
-    parent: "main",
-    tileStyle: "shadow",
-    spawn: { x: 480, y: 540 },
+  underworld: {
+    label: "The Underworld", parent: "main", tileStyle: "shadow",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "tartarus-portal", name: "Entrance to Tartarus", ...pos( 40,  60, 230, 180), color: "#1a0a1a", interior: "portal", action: { type: "goto", to: "tartarus" } },
-      { id: "hades-palace",    name: "Palace of Hades",      ...pos(370,  60, 230, 180), color: "#4a2030", interior: "portal", action: { type: "goto", to: "hades-palace" } },
-      { id: "asphodel",        name: "Fields of Asphodel",   ...pos(700,  60, 220, 180), color: "#6a5a6a", interior: "fields", action: { type: "fight", mons: ["ghost","ghost","ghost"], grant: "wingedShoes", reqInfo: "Win to claim the Winged Shoes (flight)." } },
-      { id: "styx-exit",       name: "River Styx (Exit)",    ...pos(370, 380, 230, 150), color: "#0a4a6a", interior: "river",  action: { type: "fight", mons: ["charon","cerberus"], grant: "ghostArmy", reqInfo: "Survive Charon & Cerberus to gain Ghost Army (2 uses)." } },
+      { id:"tartarus-portal", name:"Entrance to Tartarus", ...pos( 40,  60, 230, 180), color:"#1a0a1a", interior:"portal", action:{ type:"goto", to:"tartarus" } },
+      { id:"hades-palace",    name:"Palace of Hades",      ...pos(370,  60, 230, 180), color:"#4a2030", interior:"portal", action:{ type:"goto", to:"hades-palace" } },
+      { id:"asphodel",        name:"Fields of Asphodel",   ...pos(700,  60, 220, 180), color:"#6a5a6a", interior:"fields", action:{ type:"fight", mons:["ghost","ghost","ghost"], grant:"wingedShoes", reqInfo:"Win to claim the Winged Shoes (flight)." } },
+      { id:"styx-exit",       name:"River Styx (Exit)",    ...pos(370, 380, 230, 150), color:"#0a4a6a", interior:"river",  action:{ type:"fight", mons:["charon","cerberus"], grant:"ghostArmy", reqInfo:"Survive Charon & Cerberus for Ghost Army (2 uses)." } },
     ],
   },
-
-  // ============ PALACE OF HADES ============
   "hades-palace": {
-    label: "Palace of Hades",
-    parent: "underworld",
-    tileStyle: "cave",
-    spawn: { x: 480, y: 540 },
+    label: "Palace of Hades", parent: "underworld", tileStyle: "cave",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "entrance",   name: "Entrance",            ...pos( 40,  60, 280, 220), color: "#3a1a3a", interior: "throne",  action: { type: "fight", mons: ["thanatos"], msg: "Survive Thanatos and you keep your life." } },
-      { id: "throne",     name: "Throne Room (Hades)", ...pos(360,  60, 240, 220), color: "#4a1a30", interior: "throne",  action: { type: "fight", mons: ["hades"], unlock: "nico", reqInfo: "Hades is hard. Try to reason with him — or defeat him to unlock Nico." } },
-      { id: "hall",       name: "Hall of the Furies",  ...pos(640,  60, 240, 220), color: "#3a3030", interior: "throne",  action: { type: "fight", mons: ["fury","fury","fury"], unlock: "nico", reqInfo: "Defeat the Furies to unlock Nico." } },
-      { id: "garden",     name: "Persephone's Garden", ...pos(290, 360, 360, 170), color: "#6a3060", interior: "garden",  action: { type: "fight", mons: ["persephone"], grant: "ghostArmy", reqInfo: "Defeat Persephone for Ghost Army (2 uses)." } },
+      { id:"entrance", name:"Entrance",            ...pos( 40,  60, 280, 220), color:"#3a1a3a", interior:"throne", action:{ type:"fight", mons:["thanatos"], msg:"Survive Thanatos and you keep your life." } },
+      { id:"throne",   name:"Throne Room (Hades)", ...pos(360,  60, 240, 220), color:"#4a1a30", interior:"throne", action:{ type:"fight", mons:["hades"], unlock:"nico", reqInfo:"Defeat Hades to unlock Nico." } },
+      { id:"hall",     name:"Hall of the Furies",  ...pos(640,  60, 240, 220), color:"#3a3030", interior:"throne", action:{ type:"fight", mons:["fury","fury","fury"], unlock:"nico", reqInfo:"Defeat the Furies to unlock Nico." } },
+      { id:"garden",   name:"Persephone's Garden", ...pos(290, 360, 360, 170), color:"#6a3060", interior:"garden", action:{ type:"fight", mons:["persephone"], grant:"ghostArmy", reqInfo:"Defeat Persephone for Ghost Army (2 uses)." } },
     ],
   },
-
-  // ============ SEA OF MONSTERS ============
   "sea-of-monsters": {
-    label: "Sea of Monsters",
-    parent: "long-island",
-    tileStyle: "water",
-    spawn: { x: 480, y: 540 },
+    label: "Sea of Monsters", parent: "long-island", tileStyle: "water",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "ccs",       name: "C.C.'s Spa & Resort",  ...pos( 40,  60, 220, 220), color: "#b070c0", interior: "spa",      action: { type: "fight", mons: ["circe"], grant: "waterbreath", reqInfo: "Defeat Circe to gain underwater breathing." } },
-      { id: "polyphemus",name: "Polyphemus's Island",  ...pos(370,  60, 220, 220), color: "#a08050", interior: "cave",     action: { type: "fight", mons: ["polyphemus","sheep","sheep","sheep"], grant: "fleece", quest: "fleece", reqInfo: "Win to claim the Golden Fleece (healing item)." } },
-      { id: "sirens",    name: "The Sirens",           ...pos(700,  60, 220, 220), color: "#a0a0c0", interior: "cliff",    action: { type: "fight", mons: ["siren","siren","siren"], rangedRequired: true, reqInfo: "Their song drags you in — bow recommended." } },
-      { id: "scylla",    name: "Scylla & Charybdis",   ...pos(290, 360, 380, 180), color: "#7a3040", interior: "cliff",    action: { type: "fight", mons: ["scylla","charybdis"], unlock: "clarisse", reqInfo: "Get past Scylla & Charybdis to unlock Clarisse." } },
+      { id:"ccs",        name:"C.C.'s Spa & Resort",  ...pos( 40,  60, 220, 220), color:"#b070c0", interior:"spa",     action:{ type:"fight", mons:["circe"], grant:"waterbreath", reqInfo:"Defeat Circe to gain underwater breathing." } },
+      { id:"polyphemus", name:"Polyphemus's Island",  ...pos(370,  60, 220, 220), color:"#a08050", interior:"cave",    action:{ type:"fight", mons:["polyphemus","sheep","sheep","sheep"], grant:"fleece", quest:"fleece", reqInfo:"Win to claim the Golden Fleece." } },
+      { id:"sirens",     name:"The Sirens",           ...pos(700,  60, 220, 220), color:"#a0a0c0", interior:"cliff",   action:{ type:"fight", mons:["siren","siren","siren"], rangedRequired:true, reqInfo:"Their song drags you in — bow recommended." } },
+      { id:"scylla",     name:"Scylla & Charybdis",   ...pos(290, 360, 380, 180), color:"#7a3040", interior:"cliff",   action:{ type:"fight", mons:["scylla","charybdis"], unlock:"clarisse", reqInfo:"Get past them to unlock Clarisse." } },
     ],
   },
-
-  // ============ OLYMPUS ============
   olympus: {
-    label: "Olympus (600th Floor)",
-    parent: "main",
-    tileStyle: "cloud",
-    spawn: { x: 480, y: 540 },
+    label: "Olympus (600th Floor)", parent: "main", tileStyle: "cloud",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "throne-hall", name: "Throne Hall",      ...pos(280,  80, 400, 240), color: "#fffae0", interior: "throne",  action: { type: "dialog", id: "olympus" } },
-      { id: "muses",       name: "Hall of Muses",    ...pos( 40, 380, 280, 140), color: "#e0f0ff", interior: "temple",  action: { type: "heal", amount: 50, msg: "The Muses sing — you recover 50 HP." } },
-      { id: "forge",       name: "Hephaestus' Forge",...pos(640, 380, 280, 140), color: "#a06040", interior: "forge",   action: { type: "shop", id: "forge" } },
+      { id:"throne-hall", name:"Throne Hall",       ...pos(280,  80, 400, 240), color:"#fffae0", interior:"throne", action:{ type:"dialog", id:"olympus" } },
+      { id:"muses",       name:"Hall of Muses",     ...pos( 40, 380, 280, 140), color:"#e0f0ff", interior:"temple", action:{ type:"heal", amount:50, msg:"The Muses sing — you recover 50 HP." } },
+      { id:"forge",       name:"Hephaestus' Forge", ...pos(640, 380, 280, 140), color:"#a06040", interior:"forge",  action:{ type:"shop", id:"forge" } },
     ],
   },
-
-  // ============ TARTARUS ============
   tartarus: {
-    label: "Tartarus",
-    parent: "underworld",
-    tileStyle: "shadow",
-    spawn: { x: 480, y: 540 },
+    label: "Tartarus", parent: "underworld", tileStyle: "shadow",
+    spawn: sp(480, 540),
     subzones: [
-      { id: "pit",      name: "The Pit",            ...pos(180,  60, 280, 240), color: "#2a0a1a", interior: "cave", action: { type: "fight", mons: ["fury","fury","hellhound","hellhound","hellhound"], packBonus: true, msg: "You survived the Pit. The dark whispers fade." } },
-      { id: "doors",    name: "Doors of Death",     ...pos(500,  60, 280, 240), color: "#1a0a05", interior: "cave", action: { type: "fight", mons: ["thanatos","cerberus"], msg: "You sealed the Doors of Death." } },
+      { id:"pit",   name:"The Pit",        ...pos(180, 60, 280, 240), color:"#2a0a1a", interior:"cave", action:{ type:"fight", mons:["fury","fury","hellhound","hellhound","hellhound"], packBonus:true, msg:"You survived the Pit." } },
+      { id:"doors", name:"Doors of Death", ...pos(500, 60, 280, 240), color:"#1a0a05", interior:"cave", action:{ type:"fight", mons:["thanatos","cerberus"], msg:"You sealed the Doors of Death." } },
     ],
   },
 };
 
+// World bounds derived from map (1920x1200 by default)
+function mapBounds(map) {
+  if (map._bounds) return map._bounds;
+  let mx = 0, my = 0;
+  for (const z of map.subzones) { mx = Math.max(mx, z.x + z.w); my = Math.max(my, z.y + z.h); }
+  // pad
+  map._bounds = { w: Math.max(mx + 100, 1920), h: Math.max(my + 100, 1200) };
+  return map._bounds;
+}
+
 // ===== STATE =====
 const G = {
-  canvas: null, ctx: null, hud: null, toastStack: null, overlay: null, overlayPanel: null,
+  canvas: null, ctx: null,
+  hud: null, overlay: null, overlayPanel: null, toastStack: null,
   keys: {}, pressedThisFrame: {},
   lastT: 0,
-  mode: "play",              // play | interior | combat | menu
+  mode: "play",            // play | menu (and combat is in-world)
   mapId: "camp-hb",
-  prevMapId: null,
   player: null,
-  entities: [],
-  combat: null,
-  swing: null,
-  interior: null,            // { zone, w, h, walls, door, objects, player }
-  exitCooldown: 0,           // grace after entering/leaving interiors
+  interior: null,          // { zone, w, h, walls, door, sprites }
+  encounter: null,         // { mons[], onWin, onLose, label }
+  sprites: [],             // active sprites in current scene (interior or outdoor)
+  exitCooldown: 0,
+  swing: null,             // { t, weapon, hit:false }
+  hitFlash: 0,
+  victoryFlash: 0,
 };
 
 function defaultPlayer() {
   return {
-    x: 480, y: 540, w: 18, h: 18,
-    dir: { x: 0, y: -1 },
+    x: 480 * WORLD_SCALE, y: 540 * WORLD_SCALE,
+    angle: -Math.PI / 2,            // facing north (up in source coords)
     hp: 100, maxHp: 100,
     weapon: "bronze",
     weapons: ["bronze"],
-    characters: [],
-    achievements: [],
+    characters: [], achievements: [],
     flags: {},
-    arenaWins: 0,
-    monsterKills: 0,
+    arenaWins: 0, monsterKills: 0,
     quests: { bolt: "available", fleece: "available", artemis: "available" },
     specialCooldown: 0,
-    moveSpeed: PLAYER_SPEED,
+    moveSpeed: MOVE_SPEED,
+    frozenT: 0,
   };
 }
 
 // ===== SAVE / LOAD =====
-const SAVE_KEY = "theArena.save.v2";
-
+const SAVE_KEY = "theArena.save.v3";
 function save() {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      player: G.player, mapId: G.mapId,
-    }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ player: G.player, mapId: G.mapId }));
   } catch (e) {}
 }
 function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
-    const data = JSON.parse(raw);
-    G.player = Object.assign(defaultPlayer(), data.player || {});
-    G.mapId = data.mapId || "camp-hb";
+    const d = JSON.parse(raw);
+    G.player = Object.assign(defaultPlayer(), d.player || {});
+    G.mapId = d.mapId || "camp-hb";
     return true;
   } catch (e) { return false; }
 }
@@ -401,11 +323,11 @@ function resetSave() {
   localStorage.removeItem(SAVE_KEY);
   G.player = defaultPlayer();
   G.mapId = "camp-hb";
-  G.mode = "play";
   G.interior = null;
+  G.encounter = null;
+  G.sprites = [];
   enterMap("camp-hb");
-  toast("New game started.", "info");
-  save();
+  toast("New game started.", "info"); save();
 }
 
 // ===== TOAST / HUD =====
@@ -418,7 +340,8 @@ function toast(msg, kind) {
 }
 function updateHUD() {
   let label = MAPS[G.mapId].label;
-  if (G.mode === "interior" && G.interior) label += " — " + G.interior.zone.name;
+  if (G.interior) label += " — " + G.interior.zone.name;
+  if (G.encounter) label += " — combat: " + G.encounter.label;
   document.getElementById("loc-label").textContent = label;
   document.getElementById("hp-label").textContent = `HP ${Math.max(0, Math.round(G.player.hp))}/${G.player.maxHp}`;
   document.getElementById("hp-fill").style.width = (100 * G.player.hp / G.player.maxHp) + "%";
@@ -436,65 +359,50 @@ function openOverlay(html) {
 function closeOverlay() {
   G.overlay.classList.remove("open");
   G.overlayPanel.innerHTML = "";
-  G.mode = G._prevMode || (G.combat ? "combat" : (G.interior ? "interior" : "play"));
+  G.mode = "play";
 }
 function openInventory() {
   const p = G.player;
-  let html = `<h2>Inventory</h2>`;
-  html += `<h3>Weapons</h3><div class="grid">`;
+  let html = `<h2>Inventory</h2><h3>Weapons</h3><div class="grid">`;
   Object.keys(WEAPONS).forEach(k => {
     const w = WEAPONS[k];
-    const owned = p.weapons.includes(k);
-    const active = p.weapon === k;
+    const owned = p.weapons.includes(k), active = p.weapon === k;
     html += `<div class="item ${owned ? (active?'active':'') : 'locked'}" data-weapon="${k}">
       <span class="name">${w.name}</span>
       <span class="meta">${w.dmg} dmg · ${w.ranged?'ranged':'melee'}${owned?(active?' · equipped':' · click to equip'):' · locked'}</span>
     </div>`;
   });
-  html += `</div>`;
-  html += `<h3>Heroes</h3><div class="grid">`;
+  html += `</div><h3>Heroes</h3><div class="grid">`;
   Object.keys(CHARACTERS).forEach(k => {
-    const c = CHARACTERS[k];
-    const owned = p.characters.includes(k);
+    const c = CHARACTERS[k]; const owned = p.characters.includes(k);
     html += `<div class="item ${owned?'':'locked'}">
-      <span class="name">${c.name}</span>
-      <span class="meta">${owned ? c.desc : "Locked"}</span>
+      <span class="name">${c.name}</span><span class="meta">${owned ? c.desc : "Locked"}</span>
     </div>`;
   });
   html += `</div>`;
   const items = [];
-  if (p.flags.wingedShoes) items.push({ n: "Winged Shoes", d: "Flight (faster movement)" });
-  if (p.flags.fleece)       items.push({ n: "Golden Fleece", d: "Heal to full once" });
-  if (p.flags.waterbreath)  items.push({ n: "Underwater Breathing", d: "Sea travel safe" });
-  if (p.flags.automatons)   items.push({ n: "Manhattan Automatons", d: "Statue allies in NY" });
+  if (p.flags.wingedShoes) items.push({ n:"Winged Shoes", d:"Flight (faster movement)" });
+  if (p.flags.fleece)       items.push({ n:"Golden Fleece", d:"Heal to full once" });
+  if (p.flags.waterbreath)  items.push({ n:"Underwater Breathing", d:"Sea travel safe" });
+  if (p.flags.automatons)   items.push({ n:"Manhattan Automatons", d:"Statue allies in NY" });
   if (typeof p.flags.ghostArmyUses === "number" && p.flags.ghostArmyUses > 0)
-    items.push({ n: `Ghost Army (×${p.flags.ghostArmyUses})`, d: "Press special in combat to summon" });
-  if (p.flags.boar)         items.push({ n: "Boar Mount", d: "Rideable ally — defends you" });
-  if (items.length === 0) items.push({ n: "—", d: "No items yet" });
+    items.push({ n:`Ghost Army (×${p.flags.ghostArmyUses})`, d:"Press special in combat to summon" });
+  if (p.flags.boar) items.push({ n:"Boar Mount", d:"Rideable ally — defends you" });
+  if (items.length === 0) items.push({ n:"—", d:"No items yet" });
   html += `<h3>Items</h3><div class="grid">`;
   items.forEach(it => html += `<div class="item"><span class="name">${it.n}</span><span class="meta">${it.d}</span></div>`);
-  html += `</div>`;
-  html += `<h3>Achievements</h3><div class="grid">`;
+  html += `</div><h3>Achievements</h3><div class="grid">`;
   Object.keys(ACHIEVEMENTS).forEach(k => {
-    const a = ACHIEVEMENTS[k];
-    const owned = p.achievements.includes(k);
-    html += `<div class="item ${owned?'':'locked'}">
-      <span class="name">${a.icon} ${a.name}</span>
-      <span class="meta">${a.desc}</span>
-    </div>`;
+    const a = ACHIEVEMENTS[k]; const owned = p.achievements.includes(k);
+    html += `<div class="item ${owned?'':'locked'}"><span class="name">${a.icon} ${a.name}</span><span class="meta">${a.desc}</span></div>`;
   });
-  html += `</div>`;
-  html += `<h3>Quests</h3><div class="grid">`;
+  html += `</div><h3>Quests</h3><div class="grid">`;
   Object.keys(QUESTS).forEach(k => {
-    const q = QUESTS[k];
-    const s = p.quests[k] || "available";
+    const q = QUESTS[k]; const s = p.quests[k] || "available";
     html += `<div class="item ${s==='complete'?'active':(s==='inprogress'?'':'locked')}">
-      <span class="name">${q.name} ${s==='complete'?'✓':''}</span>
-      <span class="meta">${q.desc}<br><b>Reward:</b> ${q.reward}</span>
-    </div>`;
+      <span class="name">${q.name} ${s==='complete'?'✓':''}</span><span class="meta">${q.desc}<br><b>Reward:</b> ${q.reward}</span></div>`;
   });
-  html += `</div>`;
-  html += `<div style="display:flex;gap:8px;"><button id="close-inv">Close (Shift / Esc)</button></div>`;
+  html += `</div><div style="display:flex;gap:8px;"><button id="close-inv">Close (Shift / Esc)</button></div>`;
   openOverlay(html);
   document.getElementById("close-inv").onclick = closeOverlay;
   G.overlayPanel.querySelectorAll("[data-weapon]").forEach(el => {
@@ -508,41 +416,26 @@ function openInventory() {
   });
 }
 function openDialog(opts) {
-  let html = `<h2>${opts.title}</h2><p style="line-height:1.7;color:var(--text);margin-bottom:1rem;">${opts.text}</p>`;
-  html += `<div class="choice-list">`;
+  let html = `<h2>${opts.title}</h2><p style="line-height:1.7;margin-bottom:1rem;">${opts.text}</p><div class="choice-list">`;
   opts.choices.forEach((c, i) => html += `<button data-choice="${i}">${c.label}</button>`);
   html += `</div>`;
   openOverlay(html);
   G.overlayPanel.querySelectorAll("[data-choice]").forEach(el => {
     el.onclick = () => {
-      const i = parseInt(el.getAttribute("data-choice"));
-      const c = opts.choices[i];
-      closeOverlay();
-      if (c.onClick) c.onClick();
+      const i = parseInt(el.getAttribute("data-choice")); const c = opts.choices[i];
+      closeOverlay(); if (c.onClick) c.onClick();
     };
   });
 }
 function openShop(id) {
   const shops = {
-    bighouse: {
-      title: "Big House — Chiron's Provisions",
-      lines: ["Chiron offers you supplies. Nectar and ambrosia keep you fighting."],
-      items: [
-        { label: "Heal 30 HP",   run: () => { heal(30); toast("+30 HP", "good"); }},
-        { label: "Heal to Full", run: () => { G.player.hp = G.player.maxHp; toast("Healed.", "good"); save(); }},
-        { label: "Talk to Chiron (Quests)", run: () => openChiron() },
-      ],
-    },
-    mars: {
-      title: "Temple of Mars — Weapon Stand",
-      lines: ["Roman steel rests on the altar. Take what you can use."],
-      items: [{ label: "Take Pilum (Spear of Ares)", run: () => { addWeapon("c5"); toast("Acquired Spear of Ares.", "good"); }}],
-    },
-    forge: {
-      title: "Hephaestus' Forge — Olympus",
-      lines: ["Hephaestus tunes a celestial bronze edge for you."],
-      items: [{ label: "Take Gold Sword", run: () => { addWeapon("gold"); toast("Acquired Gold Sword.", "good"); }}],
-    },
+    bighouse: { title:"Big House — Chiron's Provisions", lines:["Chiron offers supplies."], items:[
+      { label:"Heal 30 HP", run:()=>{ heal(30); toast("+30 HP","good"); }},
+      { label:"Heal to Full", run:()=>{ G.player.hp = G.player.maxHp; toast("Healed.","good"); save(); }},
+      { label:"Talk to Chiron (Quests)", run:openChiron },
+    ]},
+    mars:    { title:"Temple of Mars", lines:["Roman steel rests on the altar."], items:[ { label:"Take Pilum (Spear of Ares)", run:()=>{ addWeapon("c5"); toast("Acquired Spear of Ares.","good"); }} ]},
+    forge:   { title:"Hephaestus' Forge", lines:["Celestial bronze edge."], items:[ { label:"Take Gold Sword", run:()=>{ addWeapon("gold"); toast("Acquired Gold Sword.","good"); }} ]},
   };
   const s = shops[id]; if (!s) { closeOverlay(); return; }
   let html = `<h2>${s.title}</h2>`;
@@ -557,135 +450,39 @@ function openShop(id) {
   document.getElementById("leave").onclick = closeOverlay;
 }
 function openChiron() {
-  const p = G.player;
-  const choices = [];
+  const p = G.player; const choices = [];
   Object.keys(QUESTS).forEach(qk => {
-    const q = QUESTS[qk];
-    const s = p.quests[qk];
-    if (s === "available") {
-      choices.push({ label: `Accept: ${q.name}`, onClick: () => { p.quests[qk] = "inprogress"; save(); toast(`Quest started: ${q.name}`, "info"); }});
-    } else if (s === "inprogress") {
-      choices.push({ label: `In progress: ${q.name}`, onClick: () => toast("Already on it.", "info") });
-    } else {
-      choices.push({ label: `✓ ${q.name}`, onClick: () => toast("Quest complete.", "good") });
-    }
+    const q = QUESTS[qk]; const s = p.quests[qk];
+    if (s === "available") choices.push({ label:`Accept: ${q.name}`, onClick:()=>{ p.quests[qk]="inprogress"; save(); toast(`Quest started: ${q.name}`,"info"); }});
+    else if (s === "inprogress") choices.push({ label:`In progress: ${q.name}`, onClick:()=>toast("Already on it.","info") });
+    else choices.push({ label:`✓ ${q.name}`, onClick:()=>toast("Quest complete.","good") });
   });
-  choices.push({ label: "Leave", onClick: () => {} });
-  openDialog({
-    title: "Chiron",
-    text: "\"Hero, the Fates are restless. Three quests need a champion. Which will you take?\"",
-    choices,
-  });
-}
-
-// ===== TRIGGER ACTIONS =====
-function triggerAction(zone) {
-  const a = zone.action;
-  if (!a) return;
-  const p = G.player;
-  if (a.type === "goto") {
-    if (a.achievement) grantAchievement(a.achievement);
-    if (a.msg) toast(a.msg, "info");
-    leaveInterior(false);
-    enterMap(a.to);
-    return;
-  }
-  if (a.type === "cabin") {
-    if (!p.weapons.includes(a.weapon)) {
-      p.weapons.push(a.weapon);
-      p.weapon = a.weapon;
-      toast(`${a.label}'s gift — acquired ${WEAPONS[a.weapon].name}.`, "good");
-      save();
-    } else {
-      toast(`${a.label}'s cabin. You already took the weapon.`, "info");
-    }
-    return;
-  }
-  if (a.type === "bighouse") { openShop("bighouse"); return; }
-  if (a.type === "shop")     { openShop(a.id); return; }
-  if (a.type === "heal") {
-    if (a.amount === "full") p.hp = p.maxHp; else heal(a.amount);
-    toast(a.msg || "Healed.", "good"); save(); return;
-  }
-  if (a.type === "dialog")   { openDialogScene(a.id); return; }
-  if (a.type === "arena") {
-    startCombat({
-      mons: ["demigod"],
-      label: "Camp Arena Duel",
-      onWin: () => {
-        p.arenaWins++;
-        toast(`Arena wins: ${p.arenaWins}/3`, "info");
-        if (p.arenaWins >= 3) grantAchievement("gladiator");
-        save();
-      }
-    });
-    return;
-  }
-  if (a.type === "fight") {
-    if (a.reqInfo) toast(a.reqInfo, "info");
-    startCombat({
-      mons: a.mons,
-      label: zone.name,
-      packBonus: !!a.packBonus,
-      allyIfFlag: a.allyIfFlag,
-      rangedRequired: !!a.rangedRequired,
-      onWin: () => {
-        if (a.unlock)  unlockCharacter(a.unlock);
-        if (a.grant)   grantFlag(a.grant);
-        if (a.quest)   completeQuest(a.quest);
-        if (a.msg)     toast(a.msg, "good");
-        save();
-      },
-    });
-    return;
-  }
-}
-function openDialogScene(id) {
-  if (id === "octavian") {
-    openDialog({
-      title: "Octavian, Augur of Camp Jupiter",
-      text: "\"The omens are clear! You must march on Camp Half-Blood at dawn… or buy more stuffed animals for sacrifice. Either way, war is the answer.\"",
-      choices: [
-        { label: "Ignore his terrible advice.", onClick: () => toast("Wise choice.", "info") },
-        { label: "Sigh. Loudly.", onClick: () => toast("Octavian glares.", "info") },
-      ],
-    });
-  } else if (id === "olympus") {
-    openDialog({
-      title: "The Throne of the Gods",
-      text: "Twelve thrones tower above you. Zeus's lightning crackles. The gods size you up. \"You are welcome here, hero. For now.\"",
-      choices: [
-        { label: "Bow respectfully.", onClick: () => { grantAchievement("ascension"); toast("Your name is remembered on Olympus.", "good"); }},
-        { label: "Leave.", onClick: () => {}},
-      ],
-    });
-  }
+  choices.push({ label:"Leave", onClick:()=>{} });
+  openDialog({ title:"Chiron", text:"\"Hero, the Fates are restless. Three quests need a champion. Which will you take?\"", choices });
 }
 
 // ===== UNLOCKS =====
 function grantAchievement(id) {
-  if (!ACHIEVEMENTS[id]) return;
-  if (G.player.achievements.includes(id)) return;
+  if (!ACHIEVEMENTS[id] || G.player.achievements.includes(id)) return;
   G.player.achievements.push(id);
-  toast(`Achievement: ${ACHIEVEMENTS[id].icon} ${ACHIEVEMENTS[id].name}`, "good");
-  save();
+  toast(`Achievement: ${ACHIEVEMENTS[id].icon} ${ACHIEVEMENTS[id].name}`, "good"); save();
 }
 function unlockCharacter(id) {
-  if (!CHARACTERS[id]) return;
-  if (G.player.characters.includes(id)) return;
+  if (!CHARACTERS[id] || G.player.characters.includes(id)) return;
   G.player.characters.push(id);
   toast(`Hero unlocked: ${CHARACTERS[id].name}`, "good");
   if (id === "tyson") { G.player.maxHp += 20; G.player.hp += 20; }
-  if (id === "selina") { G.player.moveSpeed = PLAYER_SPEED * 1.15; }
+  if (id === "selina") { G.player.moveSpeed = MOVE_SPEED * 1.15; }
   save();
 }
 function grantFlag(name) {
-  if (name === "automatons") { G.player.flags.automatons = true; toast("Automatons available in Manhattan.", "good"); }
-  else if (name === "wingedShoes") { G.player.flags.wingedShoes = true; G.player.moveSpeed = Math.max(G.player.moveSpeed, PLAYER_SPEED * 1.25); toast("Winged Shoes equipped — you move faster.", "good"); }
-  else if (name === "waterbreath") { G.player.flags.waterbreath = true; toast("You can now breathe underwater.", "good"); }
-  else if (name === "fleece") { G.player.flags.fleece = true; toast("The Golden Fleece glows in your pack.", "good"); }
-  else if (name === "ghostArmy") { G.player.flags.ghostArmyUses = (G.player.flags.ghostArmyUses || 0) + 2; toast("Ghost Army summons available: 2 charges.", "good"); }
-  else if (name === "boar") { G.player.flags.boar = true; G.player.maxHp += 30; G.player.hp += 30; toast("A boar joins your side. +30 max HP.", "good"); }
+  const p = G.player;
+  if (name === "automatons") { p.flags.automatons = true; toast("Automatons available in Manhattan.","good"); }
+  else if (name === "wingedShoes") { p.flags.wingedShoes = true; p.moveSpeed = Math.max(p.moveSpeed, MOVE_SPEED * 1.25); toast("Winged Shoes equipped.","good"); }
+  else if (name === "waterbreath") { p.flags.waterbreath = true; toast("You can now breathe underwater.","good"); }
+  else if (name === "fleece") { p.flags.fleece = true; toast("The Golden Fleece glows in your pack.","good"); }
+  else if (name === "ghostArmy") { p.flags.ghostArmyUses = (p.flags.ghostArmyUses||0) + 2; toast("Ghost Army: 2 charges.","good"); }
+  else if (name === "boar") { p.flags.boar = true; p.maxHp += 30; p.hp += 30; toast("A boar joins your side. +30 max HP.","good"); }
   save();
 }
 function completeQuest(id) {
@@ -698,7 +495,7 @@ function completeQuest(id) {
   }
 }
 function addWeapon(k) { if (!G.player.weapons.includes(k)) { G.player.weapons.push(k); G.player.weapon = k; } }
-function heal(amount) { G.player.hp = Math.min(G.player.maxHp, G.player.hp + amount); }
+function heal(n) { G.player.hp = Math.min(G.player.maxHp, G.player.hp + n); }
 function onKillMonster() {
   G.player.monsterKills++;
   grantAchievement("firstBlood");
@@ -706,247 +503,247 @@ function onKillMonster() {
   save();
 }
 
-// ===== COMBAT =====
+// ===== TRIGGER ACTIONS =====
+function triggerAction(zone) {
+  const a = zone.action; if (!a) return;
+  const p = G.player;
+  if (a.type === "goto") {
+    if (a.achievement) grantAchievement(a.achievement);
+    if (a.msg) toast(a.msg, "info");
+    if (G.interior) G.interior = null;
+    enterMap(a.to); return;
+  }
+  if (a.type === "cabin") {
+    if (!p.weapons.includes(a.weapon)) { p.weapons.push(a.weapon); p.weapon = a.weapon; toast(`${a.label}'s gift — ${WEAPONS[a.weapon].name}.`, "good"); save(); }
+    else toast(`${a.label}'s cabin. You already took the weapon.`, "info");
+    return;
+  }
+  if (a.type === "bighouse") { openShop("bighouse"); return; }
+  if (a.type === "shop")     { openShop(a.id); return; }
+  if (a.type === "heal")     { if (a.amount === "full") p.hp = p.maxHp; else heal(a.amount); toast(a.msg || "Healed.", "good"); save(); return; }
+  if (a.type === "dialog")   { openDialogScene(a.id); return; }
+  if (a.type === "arena") {
+    startCombat({ mons:["demigod"], label:"Camp Arena Duel", onWin:()=>{
+      p.arenaWins++; toast(`Arena wins: ${p.arenaWins}/3`, "info");
+      if (p.arenaWins >= 3) grantAchievement("gladiator"); save();
+    }});
+    return;
+  }
+  if (a.type === "fight") {
+    if (a.reqInfo) toast(a.reqInfo, "info");
+    startCombat({
+      mons:a.mons, label:zone.name, packBonus:!!a.packBonus, allyIfFlag:a.allyIfFlag, rangedRequired:!!a.rangedRequired,
+      onWin: () => {
+        if (a.unlock) unlockCharacter(a.unlock);
+        if (a.grant)  grantFlag(a.grant);
+        if (a.quest)  completeQuest(a.quest);
+        if (a.msg)    toast(a.msg, "good");
+        save();
+      },
+    });
+  }
+}
+function openDialogScene(id) {
+  if (id === "octavian") {
+    openDialog({ title:"Octavian, Augur of Camp Jupiter",
+      text:"\"The omens are clear! You must march on Camp Half-Blood at dawn… or buy more stuffed animals for sacrifice.\"",
+      choices:[ { label:"Ignore.", onClick:()=>toast("Wise choice.","info") }, { label:"Sigh.", onClick:()=>toast("Octavian glares.","info") } ]});
+  } else if (id === "olympus") {
+    openDialog({ title:"The Throne of the Gods",
+      text:"Twelve thrones tower above you. The gods size you up. \"You are welcome here, hero. For now.\"",
+      choices:[ { label:"Bow respectfully.", onClick:()=>{ grantAchievement("ascension"); toast("Your name is remembered on Olympus.","good"); }}, { label:"Leave.", onClick:()=>{} } ]});
+  }
+}
+
+// ===== COMBAT (in-world) =====
 function startCombat(opts) {
-  G.mode = "combat";
-  G.combat = { label: opts.label || "Combat", onWin: opts.onWin || (()=>{}), onLose: opts.onLose, packBonus: !!opts.packBonus, allyIfFlag: opts.allyIfFlag, rangedRequired: !!opts.rangedRequired };
-  G.entities = [];
-  G.player.x = 100; G.player.y = H/2;
-  (opts.mons || []).forEach((mid, i) => {
+  G.encounter = { mons:opts.mons||[], label:opts.label||"Combat", onWin:opts.onWin||(()=>{}), onLose:opts.onLose,
+                  packBonus:!!opts.packBonus, allyIfFlag:opts.allyIfFlag, rangedRequired:!!opts.rangedRequired };
+  spawnEncounterEnemies();
+  if (G.encounter.rangedRequired && !WEAPONS[G.player.weapon].ranged)
+    toast("A ranged weapon (Bow of Apollo) would help here.", "info");
+  if (G.encounter.allyIfFlag && G.player.flags[G.encounter.allyIfFlag]) {
+    G.sprites.push(makeAllySprite(G.player.x + Math.cos(G.player.angle)*60, G.player.y + Math.sin(G.player.angle)*60));
+    toast("An Automaton joins you.", "info");
+  }
+}
+function spawnEncounterEnemies() {
+  const enemies = G.encounter.mons;
+  enemies.forEach((mid, i) => {
     const base = MONSTERS[mid]; if (!base) return;
     let lv = base.level;
-    if (opts.packBonus && (mid === "hellhound" || mid === "dracaena")) lv = Math.min(8, lv + 1);
+    if (G.encounter.packBonus && (mid === "hellhound" || mid === "dracaena")) lv = Math.min(8, lv + 1);
     const s = statsFor(lv);
-    G.entities.push({
-      mid, name: base.name, color: base.color, note: base.note,
-      x: 700 + (i % 3) * 60 - 60 + (Math.random()*40 - 20),
-      y: 120 + (i % 4) * 100 + (Math.random()*40 - 20),
-      w: 22, h: 22,
-      hp: s.hp, maxHp: s.hp, dmg: s.dmg, speed: s.speed,
-      attackCd: 0, stunT: 0, level: lv,
+    // Spawn 80-220 units away in random direction in front
+    const ang = G.player.angle + (Math.random() - 0.5) * Math.PI * 0.8;
+    const dist = 100 + (i % 4) * 30 + Math.random() * 60;
+    G.sprites.push({
+      kind: "enemy", mid, name: base.name, shape: base.shape, color: base.color, note: base.note,
+      x: G.player.x + Math.cos(ang) * dist,
+      y: G.player.y + Math.sin(ang) * dist,
+      size: 28, height: 50,
+      hp: s.hp, maxHp: s.hp, dmg: s.dmg, speed: s.speed, level: lv,
+      attackCd: 0, stunT: 0,
     });
   });
-  G.entities.forEach(e => { e.y = Math.max(60, Math.min(H - 60, e.y)); });
-  if (opts.allyIfFlag && G.player.flags[opts.allyIfFlag]) {
-    G.entities.push({ mid: "ally", name: "Bronze Automaton", color: "#d4a040", x: 160, y: H/2 + 60, w: 22, h: 22, hp: 80, maxHp: 80, dmg: 6, speed: 110, attackCd: 0, level: 4, ally: true });
-    toast("An Automaton statue grinds to life and joins you.", "info");
-  }
-  if (G.combat.rangedRequired && !WEAPONS[G.player.weapon].ranged) toast("A ranged weapon (Bow of Apollo) would help here.", "info");
 }
 function endCombat(won) {
-  if (won) { toast(`Victory: ${G.combat.label}`, "good"); G.combat.onWin && G.combat.onWin(); }
+  if (won) { toast(`Victory: ${G.encounter.label}`, "good"); G.encounter.onWin(); }
   else {
     toast("You fell. Respawning at Half-Blood Hill.", "bad");
-    G.combat.onLose && G.combat.onLose();
+    G.encounter.onLose && G.encounter.onLose();
     G.player.hp = G.player.maxHp;
-    G.interior = null;
-    enterMap("camp-hb");
+    G.encounter = null; G.interior = null; G.sprites = [];
+    enterMap("camp-hb"); return;
   }
-  G.combat = null; G.entities = []; G.swing = null;
-  if (G.interior) G.mode = "interior"; else G.mode = "play";
+  G.encounter = null;
+  // remove enemies and ally sprites
+  G.sprites = G.sprites.filter(s => s.kind !== "enemy" && s.kind !== "ally");
   save();
 }
+function makeAllySprite(x, y) {
+  return { kind:"ally", name:"Automaton", color:"#d4a040", x, y, size:24, height:48,
+           hp:80, maxHp:80, dmg:6, speed:55, attackCd:0, level:4 };
+}
 
-// ===== MAP TRANSITIONS =====
+// ===== MAP / INTERIOR TRANSITIONS =====
 function enterMap(id) {
   if (!MAPS[id]) return;
-  G.prevMapId = G.mapId;
   G.mapId = id;
   const m = MAPS[id];
-  G.player.x = m.spawn.x;
-  G.player.y = m.spawn.y;
-  G.interior = null;
+  G.player.x = m.spawn.x; G.player.y = m.spawn.y;
+  G.player.angle = -Math.PI / 2;
+  G.interior = null; G.encounter = null;
+  G.sprites = [];
   G.mode = "play";
-  G.exitCooldown = 0.5;
+  G.exitCooldown = 0.6;
   save();
 }
 
-// ===== BUILDINGS: walls & doors =====
-const WALL_T = 8;
-const DOOR_W = 44;
-function buildingDoor(z) {
-  return { x: z.x + z.w/2 - DOOR_W/2, y: z.y + z.h - WALL_T, w: DOOR_W, h: WALL_T + 4 };
-}
-function buildingWalls(z) {
-  const d = buildingDoor(z);
-  return [
-    { x: z.x, y: z.y, w: z.w, h: WALL_T },                                      // top
-    { x: z.x, y: z.y + z.h - WALL_T, w: d.x - z.x, h: WALL_T },                 // bottom-left
-    { x: d.x + d.w, y: z.y + z.h - WALL_T, w: z.x + z.w - (d.x + d.w), h: WALL_T }, // bottom-right
-    { x: z.x, y: z.y, w: WALL_T, h: z.h },                                      // left
-    { x: z.x + z.w - WALL_T, y: z.y, w: WALL_T, h: z.h },                       // right
-  ];
-}
-
-function collidesWithWalls(walls, x, y, w, h) {
-  for (const r of walls) {
-    if (x + w > r.x && x < r.x + r.w && y + h > r.y && y < r.y + r.h) return true;
-  }
-  return false;
-}
-
-function gatherOutdoorWalls(map) {
-  const walls = [];
-  for (const z of map.subzones) {
-    if (z.outdoor) continue;
-    walls.push(...buildingWalls(z));
-  }
-  return walls;
-}
-
-function tryMoveOutdoor(p, dx, dy) {
-  const map = MAPS[G.mapId];
-  const walls = map._walls = map._walls || gatherOutdoorWalls(map);
-  const nx = p.x + dx;
-  if (!collidesWithWalls(walls, nx, p.y, p.w, p.h)) p.x = nx;
-  const ny = p.y + dy;
-  if (!collidesWithWalls(walls, p.x, ny, p.w, p.h)) p.y = ny;
-  p.x = Math.max(2, Math.min(W - 2 - p.w, p.x));
-  p.y = Math.max(2, Math.min(H - 2 - p.h, p.y));
-}
-
-// ===== INTERIORS =====
-const IW = 760, IH = 500;          // interior room size
-const IX = (W - IW) / 2, IY = (H - IH) / 2;
-
-function makeInterior(zone) {
-  const kind = zone.interior || "cabin";
-  const doorW = 80;
-  const doorX = IX + IW/2 - doorW/2;
-  const walls = [
-    { x: IX,            y: IY,            w: IW,                h: WALL_T },                   // top
-    { x: IX,            y: IY + IH - WALL_T, w: doorX - IX,        h: WALL_T },                // bottom-left
-    { x: doorX + doorW, y: IY + IH - WALL_T, w: IX + IW - (doorX + doorW), h: WALL_T },        // bottom-right
-    { x: IX,            y: IY,            w: WALL_T,             h: IH },                      // left
-    { x: IX + IW - WALL_T, y: IY,         w: WALL_T,             h: IH },                      // right
-  ];
-  const door = { x: doorX, y: IY + IH - WALL_T - 2, w: doorW, h: WALL_T + 6 };
-
-  const interior = {
-    zone, kind, walls, door,
-    objects: [],
-    spawn: { x: IX + IW/2 - 9, y: IY + IH - 50 },
-  };
-
-  const cx = IX + IW/2, cy = IY + IH/2;
+// Interior dimensions (world units)
+const I_W = 600, I_H = 400;
+function buildInterior(zone) {
   const a = zone.action || {};
+  const T = 8;
+  const doorW = 60;
+  const doorX = I_W/2 - doorW/2;
+  const walls = [
+    { x: 0, y: 0, w: I_W, h: T, color:"#3a2a1a" },
+    { x: 0, y: I_H - T, w: doorX, h: T, color:"#3a2a1a" },
+    { x: doorX + doorW, y: I_H - T, w: I_W - doorX - doorW, h: T, color:"#3a2a1a" },
+    { x: 0, y: 0, w: T, h: I_H, color:"#3a2a1a" },
+    { x: I_W - T, y: 0, w: T, h: I_H, color:"#3a2a1a" },
+  ];
+  const door = { x: doorX, y: I_H - T - 4, w: doorW, h: T + 8 };
+  const inter = { zone, w: I_W, h: I_H, walls, door, kind: zone.interior || "cabin" };
 
-  function addPedestal(label, color, onStep, w=64, h=64) {
-    interior.objects.push({ kind: "pedestal", x: cx - w/2, y: cy - h/2, w, h, label, color, onStep });
-  }
-  function addNPC(label, color, onStep) {
-    interior.objects.push({ kind: "npc", x: cx - 18, y: cy - 40, w: 36, h: 44, label, color, onStep });
-  }
-  function addMonsters(mons, onContact) {
-    mons.forEach((mid, i) => {
-      const base = MONSTERS[mid] || { color: "#a44", name: mid };
-      const cols = Math.min(4, mons.length);
-      const r = Math.floor(i / cols), c = i % cols;
-      interior.objects.push({
-        kind: "monster", mid, name: base.name, color: base.color,
-        x: IX + 80 + c * 90 + (Math.random()*20 - 10),
-        y: IY + 70 + r * 70 + (Math.random()*20 - 10),
-        w: 28, h: 28,
-        onStep: onContact,
-      });
-    });
-  }
-  function addDecor(items) {
-    items.forEach(it => interior.objects.push(Object.assign({ kind: "decor" }, it)));
-  }
+  const cx = I_W/2, cy = I_H/2;
+  const sprites = [];
+  function add(s) { sprites.push(s); }
 
   if (a.type === "cabin") {
-    addPedestal(`${a.label}'s gift`, "#ffe040", () => triggerAction(zone));
-    // Beds
-    addDecor([
-      { x: IX + 40, y: IY + 60, w: 110, h: 60, color: "#a89878", label: "Bed" },
-      { x: IX + IW - 150, y: IY + 60, w: 110, h: 60, color: "#a89878", label: "Bed" },
-      { x: IX + 40, y: IY + IH - 120, w: 80, h: 30, color: "#5a3a20", label: "Trunk" },
-      { x: IX + IW - 120, y: IY + IH - 120, w: 80, h: 30, color: "#5a3a20", label: "Trunk" },
-    ]);
-    // banner
-    interior.banner = a.label;
+    add({ kind:"pedestal", x: cx, y: cy, size: 30, height: 50, color:"#ffe040", label:`${a.label}'s Gift`, onStep:()=>triggerAction(zone) });
+  } else if (a.type === "bighouse") {
+    add({ kind:"npc", x: cx, y: cy - 50, size: 24, height: 50, color:"#7a4a2a", label:"Chiron", onStep:()=>triggerAction(zone) });
+  } else if (a.type === "arena") {
+    add({ kind:"ring", x: cx, y: cy, size: 70, height: 30, color:"#a87836", label:"Step in to duel", onStep:()=>triggerAction(zone) });
+  } else if (a.type === "fight") {
+    a.mons.forEach((mid, i) => {
+      const base = MONSTERS[mid] || { color:"#a44", shape:"humanoid", name:mid };
+      const cols = Math.min(4, a.mons.length);
+      const r = Math.floor(i / cols), c = i % cols;
+      add({ kind:"enemyPreview", mid, name:base.name, shape:base.shape, color:base.color,
+            x: 80 + c * 120, y: 80 + r * 100, size:28, height:50, onStep:()=>triggerAction(zone) });
+    });
+  } else if (a.type === "goto") {
+    add({ kind:"portal", x: cx, y: cy, size: 50, height: 90, color:"#5070d0", label: zone.name, onStep:()=>triggerAction(zone) });
+  } else if (a.type === "heal") {
+    add({ kind:"fountain", x: cx, y: cy, size: 40, height: 30, color:"#80d0ff", label:"Rest", onStep:()=>triggerAction(zone) });
+  } else if (a.type === "shop") {
+    add({ kind:"npc", x: cx, y: cy - 50, size: 24, height: 50, color:"#c0a060", label:"Shopkeeper", onStep:()=>triggerAction(zone) });
+  } else if (a.type === "dialog") {
+    add({ kind:"npc", x: cx, y: cy - 50, size: 24, height: 50, color:"#ddb060", label:"Speak", onStep:()=>triggerAction(zone) });
   }
-  else if (a.type === "bighouse") {
-    addNPC("Chiron", "#7a4a2a", () => triggerAction(zone));
-    addDecor([
-      { x: IX + 40, y: IY + IH - 120, w: 160, h: 40, color: "#6a4a2a", label: "Couch" },
-      { x: IX + IW - 200, y: IY + IH - 120, w: 160, h: 40, color: "#6a4a2a", label: "Couch" },
-      { x: IX + 60, y: IY + 60, w: 80, h: 80, color: "#3a2812", label: "Bookshelf" },
-      { x: IX + IW - 140, y: IY + 60, w: 80, h: 80, color: "#3a2812", label: "Bookshelf" },
-    ]);
-  }
-  else if (a.type === "arena") {
-    interior.objects.push({ kind: "ring", x: cx - 140, y: cy - 80, w: 280, h: 160, color: "#a87836", label: "Step inside to duel", onStep: () => triggerAction(zone) });
-  }
-  else if (a.type === "fight") {
-    addMonsters(a.mons, () => triggerAction(zone));
-    if (a.allyIfFlag && G.player.flags[a.allyIfFlag]) {
-      addDecor([{ x: IX + IW/2 - 30, y: IY + IH - 100, w: 60, h: 50, color: "#d4a040", label: "Statue (will help)" }]);
-    }
-  }
-  else if (a.type === "goto") {
-    interior.objects.push({ kind: "portal", x: cx - 50, y: cy - 50, w: 100, h: 100, color: "#6080ff", label: zone.name, onStep: () => triggerAction(zone) });
-  }
-  else if (a.type === "heal") {
-    interior.objects.push({ kind: "fountain", x: cx - 40, y: cy - 40, w: 80, h: 80, color: "#80d0ff", label: "Rest", onStep: () => triggerAction(zone) });
-  }
-  else if (a.type === "shop") {
-    addNPC("Browse Wares", "#c0a060", () => triggerAction(zone));
-    addDecor([
-      { x: IX + 60, y: IY + 80, w: 100, h: 40, color: "#7a5a30", label: "Display" },
-      { x: IX + IW - 160, y: IY + 80, w: 100, h: 40, color: "#7a5a30", label: "Display" },
-    ]);
-  }
-  else if (a.type === "dialog") {
-    addNPC("Speak", "#ddb060", () => triggerAction(zone));
-  }
-
-  return interior;
+  inter.sprites = sprites;
+  return inter;
 }
-
 function enterInterior(zone) {
-  G.interior = makeInterior(zone);
-  // Place player just inside the door
-  G.player.x = G.interior.spawn.x;
-  G.player.y = G.interior.spawn.y;
-  G.player.dir = { x: 0, y: -1 };
-  G.mode = "interior";
-  G.exitCooldown = 0.4;
+  G.interior = buildInterior(zone);
+  G.sprites = G.interior.sprites.slice();
+  // Player spawns just inside the door, facing in
+  G.player.x = I_W / 2;
+  G.player.y = I_H - 40;
+  G.player.angle = -Math.PI / 2;
+  G.mode = "play";
+  G.exitCooldown = 0.5;
   toast(`Entered ${zone.name}`, "info");
 }
-
 function leaveInterior(showToast=true) {
   if (!G.interior) return;
   const z = G.interior.zone;
-  G.interior = null;
+  G.interior = null; G.sprites = []; G.encounter = null;
+  // Stand player just outside the building door in the outdoor map
+  const door = buildingDoor(z);
+  G.player.x = door.x + door.w/2;
+  G.player.y = door.y + door.h + 14;
+  G.player.angle = Math.PI / 2; // facing down/south away from building
   G.mode = "play";
-  // Stand player just outside the building door
-  const out = buildingDoor(z);
-  G.player.x = out.x + out.w/2 - G.player.w/2;
-  G.player.y = out.y + out.h + 4;
-  G.exitCooldown = 0.5;
+  G.exitCooldown = 0.6;
   if (showToast) toast(`Left ${z.name}`, "info");
   save();
 }
 
-function tryMoveInterior(p, dx, dy) {
-  const inter = G.interior;
-  const nx = p.x + dx;
-  if (!collidesWithWalls(inter.walls, nx, p.y, p.w, p.h) && !collidesWithSolidObjs(inter, nx, p.y, p.w, p.h)) p.x = nx;
-  const ny = p.y + dy;
-  if (!collidesWithWalls(inter.walls, p.x, ny, p.w, p.h) && !collidesWithSolidObjs(inter, p.x, ny, p.w, p.h)) p.y = ny;
-  // Clamp to interior bounds + a little padding for the door
-  p.x = Math.max(IX, Math.min(IX + IW - p.w, p.x));
-  p.y = Math.max(IY, Math.min(IY + IH + 30, p.y));
+// ===== WALLS / DOORS =====
+const WALL_T = 8;
+const DOOR_W = 44;
+function buildingDoor(z) { return { x: z.x + z.w/2 - DOOR_W/2, y: z.y + z.h - WALL_T, w: DOOR_W, h: WALL_T + 8 }; }
+function buildingWalls(z) {
+  const d = buildingDoor(z);
+  return [
+    { x: z.x, y: z.y, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
+    { x: z.x, y: z.y + z.h - WALL_T, w: d.x - z.x, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
+    { x: d.x + d.w, y: z.y + z.h - WALL_T, w: z.x + z.w - d.x - d.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
+    { x: z.x, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true },
+    { x: z.x + z.w - WALL_T, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true },
+  ];
+}
+function getOutdoorWalls() {
+  const m = MAPS[G.mapId];
+  if (m._wallCache) return m._wallCache;
+  const walls = [];
+  for (const z of m.subzones) {
+    if (z.outdoor) continue;
+    for (const w of buildingWalls(z)) walls.push(w);
+  }
+  // Add map bounds as walls
+  const b = mapBounds(m);
+  walls.push({ x: -10, y: -10, w: b.w + 20, h: 10, color:"#000", vertical:false });
+  walls.push({ x: -10, y: b.h, w: b.w + 20, h: 10, color:"#000", vertical:false });
+  walls.push({ x: -10, y: -10, w: 10, h: b.h + 20, color:"#000", vertical:true });
+  walls.push({ x: b.w, y: -10, w: 10, h: b.h + 20, color:"#000", vertical:true });
+  m._wallCache = walls;
+  return walls;
+}
+function getInteriorWalls() {
+  return G.interior.walls.map(w => Object.assign({ vertical: w.w < w.h }, w));
 }
 
-function collidesWithSolidObjs(inter, x, y, w, h) {
-  for (const o of inter.objects) {
-    if (o.kind !== "decor") continue;
-    if (x + w > o.x && x < o.x + o.w && y + h > o.y && y < o.y + o.h) return true;
+// Collision against rectangles using point + radius
+function collidesCircle(walls, x, y, r) {
+  for (const w of walls) {
+    const cx = Math.max(w.x, Math.min(x, w.x + w.w));
+    const cy = Math.max(w.y, Math.min(y, w.y + w.h));
+    const dx = x - cx, dy = y - cy;
+    if (dx*dx + dy*dy < r*r) return true;
   }
   return false;
+}
+
+function moveWithCollision(p, dx, dy, walls) {
+  const nx = p.x + dx;
+  if (!collidesCircle(walls, nx, p.y, PLAYER_R)) p.x = nx;
+  const ny = p.y + dy;
+  if (!collidesCircle(walls, p.x, ny, PLAYER_R)) p.y = ny;
 }
 
 // ===== INPUT =====
@@ -958,561 +755,758 @@ function setupInput() {
     if (e.code === "Escape") {
       e.preventDefault();
       if (G.mode === "menu") { closeOverlay(); return; }
-      if (G.mode === "interior") { leaveInterior(); return; }
-      if (G.mode === "play") {
-        const m = MAPS[G.mapId];
-        if (m.parent) enterMap(m.parent);
-      }
+      if (G.encounter) { toast("You can't escape combat. Fight!", "bad"); return; }
+      if (G.interior) { leaveInterior(); return; }
+      const m = MAPS[G.mapId]; if (m.parent) enterMap(m.parent);
       return;
     }
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
       e.preventDefault();
       if (G.mode === "menu") { closeOverlay(); return; }
-      openInventory();
-      return;
+      openInventory(); return;
     }
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD"].includes(e.code)) e.preventDefault();
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD","KeyQ","KeyE"].includes(e.code)) e.preventDefault();
   });
   window.addEventListener("keyup", e => { G.keys[e.code] = false; });
 }
 
 // ===== UPDATE =====
-function inputAxis() {
-  let dx = 0, dy = 0;
-  if (G.keys.ArrowLeft || G.keys.KeyA) dx -= 1;
-  if (G.keys.ArrowRight || G.keys.KeyD) dx += 1;
-  if (G.keys.ArrowUp || G.keys.KeyW) dy -= 1;
-  if (G.keys.ArrowDown || G.keys.KeyS) dy += 1;
-  if (dx && dy) { dx *= 0.7071; dy *= 0.7071; }
-  return { dx, dy };
-}
-
-function updatePlay(dt) {
+function update(dt) {
+  if (G.mode !== "play") return;
   const p = G.player;
   if (p.specialCooldown > 0) p.specialCooldown = Math.max(0, p.specialCooldown - dt);
   if (G.exitCooldown > 0) G.exitCooldown = Math.max(0, G.exitCooldown - dt);
+  if (G.hitFlash > 0) G.hitFlash = Math.max(0, G.hitFlash - dt);
+  if (G.victoryFlash > 0) G.victoryFlash = Math.max(0, G.victoryFlash - dt);
 
-  const { dx, dy } = inputAxis();
-  const speed = p.moveSpeed;
-  if (dx || dy) { p.dir.x = dx; p.dir.y = dy; }
-  tryMoveOutdoor(p, dx * speed * dt, dy * speed * dt);
+  // Turn
+  let turn = 0;
+  if (G.keys.ArrowLeft || G.keys.KeyA) turn -= 1;
+  if (G.keys.ArrowRight || G.keys.KeyD) turn += 1;
+  p.angle += turn * TURN_SPEED * dt;
 
-  // Check for door step on buildings, or zone overlap for outdoor zones
+  // Forward/back/strafe
+  let fwd = 0, strafe = 0;
+  if (G.keys.ArrowUp   || G.keys.KeyW) fwd += 1;
+  if (G.keys.ArrowDown || G.keys.KeyS) fwd -= 1;
+  if (G.keys.KeyQ) strafe -= 1;
+  if (G.keys.KeyE) strafe += 1;
+
+  const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+  const sp = p.frozenT > 0 ? 0 : p.moveSpeed;
+  if (p.frozenT > 0) p.frozenT -= dt;
+  if (fwd || strafe) {
+    const dx = (Math.cos(p.angle) * fwd + Math.cos(p.angle + Math.PI/2) * strafe) * sp * dt;
+    const dy = (Math.sin(p.angle) * fwd + Math.sin(p.angle + Math.PI/2) * strafe) * sp * dt;
+    moveWithCollision(p, dx, dy, walls);
+  }
+
+  // Outdoor zone overlap → goto map
   const m = MAPS[G.mapId];
-  for (const z of m.subzones) {
-    if (z.outdoor) {
-      // Walking onto an outdoor region triggers transition
-      const inside = (p.x + p.w > z.x && p.x < z.x + z.w &&
-                      p.y + p.h > z.y && p.y < z.y + z.h);
-      if (inside && G.exitCooldown <= 0) {
-        triggerAction(z);
-        return;
+  if (!G.interior) {
+    for (const z of m.subzones) {
+      if (!z.outdoor) continue;
+      if (p.x > z.x && p.x < z.x + z.w && p.y > z.y && p.y < z.y + z.h && G.exitCooldown <= 0) {
+        triggerAction(z); return;
       }
-    } else {
-      // Building: stepping onto the door enters interior
+    }
+    // Door step → enter interior
+    for (const z of m.subzones) {
+      if (z.outdoor) continue;
       if (G.exitCooldown > 0) continue;
       const d = buildingDoor(z);
-      const onDoor = (p.x + p.w > d.x && p.x < d.x + d.w &&
-                      p.y + p.h > d.y && p.y < d.y + d.h);
-      if (onDoor) { enterInterior(z); return; }
-    }
-  }
-
-  if (G.pressedThisFrame.Enter) tryUseSpecial();
-}
-
-function updateInterior(dt) {
-  const p = G.player;
-  if (p.specialCooldown > 0) p.specialCooldown = Math.max(0, p.specialCooldown - dt);
-  if (G.exitCooldown > 0) G.exitCooldown = Math.max(0, G.exitCooldown - dt);
-  const inter = G.interior;
-  const { dx, dy } = inputAxis();
-  if (dx || dy) { p.dir.x = dx; p.dir.y = dy; }
-  tryMoveInterior(p, dx * p.moveSpeed * dt, dy * p.moveSpeed * dt);
-
-  // Door exit (step out through the door at the bottom)
-  if (G.exitCooldown <= 0) {
-    const d = inter.door;
-    if (p.y + p.h > d.y + 4 && p.x + p.w > d.x && p.x < d.x + d.w) {
-      leaveInterior();
-      return;
-    }
-  }
-
-  // Action object overlap
-  for (const o of inter.objects) {
-    if (!o.onStep) continue;
-    const inside = (p.x + p.w > o.x && p.x < o.x + o.w &&
-                    p.y + p.h > o.y && p.y < o.y + o.h);
-    if (inside) {
-      o.onStep();
-      // For most actions we leave the interior or open an overlay; protect against re-trigger
-      G.exitCooldown = 0.6;
-      break;
-    }
-  }
-
-  if (G.pressedThisFrame.Enter) tryUseSpecial();
-}
-
-// ===== COMBAT UPDATE =====
-function updateCombat(dt) {
-  const p = G.player;
-  if (p.specialCooldown > 0) p.specialCooldown = Math.max(0, p.specialCooldown - dt);
-  const { dx, dy } = inputAxis();
-  p.x += dx * p.moveSpeed * dt;
-  p.y += dy * p.moveSpeed * dt;
-  if (dx || dy) { p.dir.x = dx; p.dir.y = dy; }
-  p.x = Math.max(10, Math.min(W - 10 - p.w, p.x));
-  p.y = Math.max(60, Math.min(H - 10 - p.h, p.y));
-  if (G.pressedThisFrame.Space && !G.swing) {
-    G.swing = { t: 0, weapon: p.weapon, dx: p.dir.x, dy: p.dir.y, hits: [] };
-  }
-  if (G.swing) {
-    G.swing.t += dt;
-    const w = WEAPONS[G.swing.weapon];
-    if (G.swing.t >= w.cd * 0.35 && G.swing.hits.length === 0) {
-      const reach = w.reach;
-      const angleArc = w.ranged ? Math.PI/8 : Math.PI/3;
-      const dlen = Math.hypot(G.swing.dx, G.swing.dy) || 1;
-      const ax = G.swing.dx / dlen, ay = G.swing.dy / dlen;
-      for (const e of G.entities) {
-        if (e.dead || e.ally) continue;
-        const ex = e.x + e.w/2 - (p.x + p.w/2);
-        const ey = e.y + e.h/2 - (p.y + p.h/2);
-        const d = Math.hypot(ex, ey);
-        if (d > reach) continue;
-        const dot = (ex*ax + ey*ay) / (d || 1);
-        if (dot < Math.cos(angleArc)) continue;
-        const baseDmg = w.dmg + (G.player.characters.includes("clarisse") ? Math.round(w.dmg * 0.25) : 0);
-        const crit = G.player.characters.includes("bianca") && Math.random() < 0.18 ? 2 : 1;
-        const damage = baseDmg * crit;
-        e.hp -= damage;
-        G.swing.hits.push(e);
-        spawnFloat(e.x + e.w/2, e.y, `-${damage}${crit>1?"!":""}`, "#ffd060");
-        if (e.hp <= 0) { e.dead = true; if (e.mid !== "ally") onKillMonster(); }
+      if (p.x > d.x && p.x < d.x + d.w && p.y > d.y - 6 && p.y < d.y + d.h + 6) {
+        enterInterior(z); return;
       }
     }
-    if (G.swing.t >= w.cd) G.swing = null;
+  } else {
+    // Interior door → leave
+    if (G.exitCooldown <= 0) {
+      const d = G.interior.door;
+      if (p.x > d.x && p.x < d.x + d.w && p.y > d.y) {
+        leaveInterior(); return;
+      }
+    }
+  }
+
+  // Sprite proximity triggers (interior objects + combat AI)
+  updateSprites(dt);
+
+  // Attack swing
+  if (G.swing) {
+    G.swing.t += dt;
+    const wpn = WEAPONS[G.swing.weapon];
+    if (G.swing.t >= wpn.cd * 0.35 && !G.swing.hit) {
+      G.swing.hit = true;
+      doSwingHit();
+    }
+    if (G.swing.t >= wpn.cd) G.swing = null;
+  } else if (G.pressedThisFrame.Space) {
+    G.swing = { t: 0, weapon: G.player.weapon, hit: false };
   }
   if (G.pressedThisFrame.Enter) tryUseSpecial();
-  for (const e of G.entities) {
-    if (e.ally && !e.dead) {
-      let nearest = null, nd = Infinity;
-      for (const m of G.entities) { if (m === e || m.dead || m.ally) continue; const d = Math.hypot(m.x - e.x, m.y - e.y); if (d < nd) { nd = d; nearest = m; }}
-      if (nearest) {
-        const dx2 = nearest.x - e.x, dy2 = nearest.y - e.y;
-        const dl = Math.hypot(dx2, dy2) || 1;
-        e.x += (dx2/dl) * e.speed * dt;
-        e.y += (dy2/dl) * e.speed * dt;
-        e.attackCd = (e.attackCd || 0) - dt;
-        if (nd < 28 && e.attackCd <= 0) {
-          nearest.hp -= e.dmg; e.attackCd = 0.7;
-          spawnFloat(nearest.x + nearest.w/2, nearest.y, `-${e.dmg}`, "#d4a040");
-          if (nearest.hp <= 0) { nearest.dead = true; onKillMonster(); }
+
+  // Death check
+  if (G.player.hp <= 0) {
+    if (G.encounter) endCombat(false);
+    else { G.player.hp = G.player.maxHp; toast("You collapse. Respawn at Half-Blood Hill.", "bad"); enterMap("camp-hb"); }
+  }
+}
+
+function updateSprites(dt) {
+  const p = G.player;
+  const remove = [];
+  for (let i = 0; i < G.sprites.length; i++) {
+    const s = G.sprites[i];
+    // Interior interactables: walk-into trigger
+    if (s.onStep && !s._triggered) {
+      const dx = s.x - p.x, dy = s.y - p.y;
+      const d2 = dx*dx + dy*dy;
+      const trigR = (s.size || 24) + PLAYER_R;
+      if (d2 < trigR * trigR) {
+        s._triggered = true;
+        s.onStep();
+        G.exitCooldown = 0.7;
+        // Many onStep handlers replace G.sprites or G.interior — be defensive
+        break;
+      }
+    }
+    // Enemy AI
+    if (s.kind === "enemy") {
+      if (s.deadT !== undefined) { s.deadT += dt; if (s.deadT > 0.4) remove.push(i); continue; }
+      if (s.stunT > 0) { s.stunT -= dt; continue; }
+      const dx = p.x - s.x, dy = p.y - s.y;
+      const d = Math.hypot(dx, dy) || 1;
+      // Charybdis sucks player in
+      if (s.mid === "charybdis") {
+        p.x += (-dx/d) * 30 * dt; // pull player toward s
+        p.y += (-dy/d) * 30 * dt;
+      }
+      let spMul = 1;
+      if (s.mid === "siren") spMul = 0.7;
+      if (s.mid === "polyphemus") spMul = 0.85;
+      const moveD = s.speed * spMul * dt;
+      if (d > 30) {
+        const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+        const nx = s.x + (dx/d) * moveD;
+        const ny = s.y + (dy/d) * moveD;
+        if (!collidesCircle(walls, nx, s.y, s.size/2)) s.x = nx;
+        if (!collidesCircle(walls, s.x, ny, s.size/2)) s.y = ny;
+      }
+      s.attackCd -= dt;
+      if (d < 36 && s.attackCd <= 0) {
+        let dmg = s.dmg;
+        if (s.mid === "empousa" && Math.random() < 0.25) dmg *= 2;
+        p.hp -= dmg; s.attackCd = 0.9; G.hitFlash = 0.3;
+        if (s.mid === "thanatos" && Math.random() < 0.3) {
+          p.frozenT = 3.0; toast("Thanatos freezes you for 3 seconds.", "bad");
+        }
+      }
+    } else if (s.kind === "ally") {
+      // find nearest enemy, attack
+      let near = null, nd = Infinity;
+      for (const e of G.sprites) { if (e.kind !== "enemy" || e.deadT !== undefined) continue;
+        const d = Math.hypot(e.x - s.x, e.y - s.y); if (d < nd) { nd = d; near = e; } }
+      if (near) {
+        const dx = near.x - s.x, dy = near.y - s.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const moveD = s.speed * dt;
+        s.x += (dx/d) * moveD; s.y += (dy/d) * moveD;
+        s.attackCd -= dt;
+        if (d < 32 && s.attackCd <= 0) {
+          near.hp -= s.dmg; s.attackCd = 0.7;
+          if (near.hp <= 0) { near.deadT = 0; onKillMonster(); }
         }
       }
     }
   }
-  for (const e of G.entities) {
-    if (e.dead || e.ally) continue;
-    if (e.stunT > 0) { e.stunT -= dt; continue; }
-    if (e.mid === "charybdis") {
-      const dx2 = e.x - p.x, dy2 = e.y - p.y;
-      const dl = Math.hypot(dx2, dy2) || 1;
-      p.x += (dx2/dl) * 30 * dt; p.y += (dy2/dl) * 30 * dt;
-    }
-    let speedMul = 1;
-    if (e.mid === "siren") speedMul = 0.6;
-    if (e.mid === "polyphemus") speedMul = 0.8;
-    const dx2 = (p.x + p.w/2) - (e.x + e.w/2);
-    const dy2 = (p.y + p.h/2) - (e.y + e.h/2);
-    const dl = Math.hypot(dx2, dy2) || 1;
-    if (dl > 18) {
-      e.x += (dx2/dl) * e.speed * speedMul * dt;
-      e.y += (dy2/dl) * e.speed * speedMul * dt;
-    }
-    e.attackCd = (e.attackCd || 0) - dt;
-    if (dl < 26 && e.attackCd <= 0) {
-      let dmg = e.dmg;
-      if (e.mid === "empousa" && Math.random() < 0.25) dmg *= 2;
-      p.hp -= dmg; e.attackCd = 0.9;
-      spawnFloat(p.x + p.w/2, p.y, `-${dmg}`, "#ff7070");
-      if (e.mid === "thanatos" && Math.random() < 0.3) { p.frozenT = 3.0; toast("Thanatos freezes you for 3 seconds.", "bad"); }
-    }
+  for (let i = remove.length - 1; i >= 0; i--) G.sprites.splice(remove[i], 1);
+  // Encounter resolution
+  if (G.encounter) {
+    const enemiesAlive = G.sprites.some(s => s.kind === "enemy" && s.deadT === undefined);
+    if (!enemiesAlive) endCombat(true);
   }
-  if (p.frozenT > 0) p.frozenT -= dt;
-  G.entities = G.entities.filter(e => !e.dead || (e.deadT = (e.deadT || 0) + dt) < 0.35);
-  const enemies = G.entities.filter(e => !e.dead && !e.ally);
-  if (enemies.length === 0) { endCombat(true); return; }
-  if (p.hp <= 0) { endCombat(false); return; }
+}
+
+function doSwingHit() {
+  const p = G.player;
+  const w = WEAPONS[p.weapon];
+  const ax = Math.cos(p.angle), ay = Math.sin(p.angle);
+  const arc = w.ranged ? Math.PI/10 : Math.PI/3;
+  for (const s of G.sprites) {
+    if (s.kind !== "enemy" && s.kind !== "enemyPreview") continue;
+    if (s.deadT !== undefined) continue;
+    const dx = s.x - p.x, dy = s.y - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    if (d > w.reach) continue;
+    const dot = (dx*ax + dy*ay) / d;
+    if (dot < Math.cos(arc)) continue;
+    // enemyPreview: walking-into triggers fight; here, hitting one also triggers the fight
+    if (s.kind === "enemyPreview" && s.onStep && !s._triggered) {
+      s._triggered = true;
+      s.onStep();
+      return;
+    }
+    const baseDmg = w.dmg + (p.characters.includes("clarisse") ? Math.round(w.dmg * 0.25) : 0);
+    const crit = p.characters.includes("bianca") && Math.random() < 0.18 ? 2 : 1;
+    const damage = baseDmg * crit;
+    s.hp -= damage;
+    if (s.hp <= 0) { s.deadT = 0; if (s.kind === "enemy") onKillMonster(); }
+  }
 }
 
 function tryUseSpecial() {
   const p = G.player;
   if (p.specialCooldown > 0) { toast(`Special on cooldown (${Math.ceil(p.specialCooldown)}s)`, "bad"); return; }
-  if (G.mode === "combat" && p.flags.ghostArmyUses > 0) {
+  if (G.encounter && p.flags.ghostArmyUses > 0) {
     p.flags.ghostArmyUses--;
     for (let i = 0; i < 3; i++) {
-      G.entities.push({ mid: "ally", name: "Ghost", color: "#c8d0e0", x: G.player.x + 24, y: G.player.y + (i-1)*30, w: 18, h: 18, hp: 40, maxHp: 40, dmg: 8, speed: 130, ally: true, attackCd: 0, level: 4 });
+      G.sprites.push({ kind:"ally", name:"Ghost", color:"#c8d0e0", x: p.x + Math.cos(p.angle + (i-1)*0.3)*40, y: p.y + Math.sin(p.angle + (i-1)*0.3)*40, size:22, height:48, hp:40, maxHp:40, dmg:8, speed:80, attackCd:0, level:4 });
     }
-    toast(`Ghost Army summoned! Remaining uses: ${p.flags.ghostArmyUses}`, "good");
+    toast(`Ghost Army summoned (${p.flags.ghostArmyUses} left)`, "good");
     p.specialCooldown = 10; save(); return;
   }
-  const before = p.hp; heal(30); const healed = p.hp - before;
-  toast(healed > 0 ? `+${healed} HP` : "Already full HP.", healed > 0 ? "good" : "info");
+  const before = p.hp; heal(30); const got = p.hp - before;
+  toast(got > 0 ? `+${got} HP` : "Already full HP.", got > 0 ? "good" : "info");
   p.specialCooldown = G.player.characters.includes("annabeth") ? 6 : 10;
   save();
 }
 
-// ===== FLOATS =====
-const floats = [];
-function spawnFloat(x, y, text, color) { floats.push({ x, y, text, color, t: 0 }); }
+// ===== COLOR HELPERS =====
+function parseColor(hex) {
+  if (hex.startsWith("rgb")) {
+    const m = hex.match(/\d+/g);
+    return { r: +m[0], g: +m[1], b: +m[2] };
+  }
+  if (!hex.startsWith("#")) hex = "#888";
+  if (hex.length === 4) hex = "#" + hex[1]+hex[1] + hex[2]+hex[2] + hex[3]+hex[3];
+  return { r: parseInt(hex.slice(1,3),16), g: parseInt(hex.slice(3,5),16), b: parseInt(hex.slice(5,7),16) };
+}
+function shadeColor(hex, k) {
+  const c = parseColor(hex);
+  return `rgb(${Math.round(c.r*k)|0},${Math.round(c.g*k)|0},${Math.round(c.b*k)|0})`;
+}
+
+// ===== RAYCASTER =====
+function raySegT(rx, ry, rdx, rdy, x1, y1, x2, y2) {
+  const sx = x2 - x1, sy = y2 - y1;
+  const denom = rdx * sy - rdy * sx;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((x1 - rx) * sy - (y1 - ry) * sx) / denom;
+  const u = ((x1 - rx) * rdy - (y1 - ry) * rdx) / denom;
+  if (t > 0 && u >= 0 && u <= 1) return t;
+  return null;
+}
+function castRay(walls, ox, oy, angle) {
+  const dx = Math.cos(angle), dy = Math.sin(angle);
+  let nearest = null;
+  for (const w of walls) {
+    const segs = [
+      [w.x, w.y, w.x + w.w, w.y, false],
+      [w.x + w.w, w.y, w.x + w.w, w.y + w.h, true],
+      [w.x + w.w, w.y + w.h, w.x, w.y + w.h, false],
+      [w.x, w.y + w.h, w.x, w.y, true],
+    ];
+    for (const s of segs) {
+      const t = raySegT(ox, oy, dx, dy, s[0], s[1], s[2], s[3]);
+      if (t !== null && t > 0.01) {
+        if (!nearest || t < nearest.dist) {
+          nearest = { dist: t, color: w.color, vertical: s[4] };
+        }
+      }
+    }
+  }
+  return nearest;
+}
 
 // ===== RENDER =====
 function render() {
   const ctx = G.ctx;
   ctx.clearRect(0, 0, W, H);
-  if (G.mode === "combat" || (G.mode === "menu" && G.combat)) renderCombat();
-  else if (G.mode === "interior" || (G.mode === "menu" && G.interior)) renderInterior();
-  else renderPlay();
-
-  // Floating numbers (combat)
-  for (let i = floats.length - 1; i >= 0; i--) {
-    const f = floats[i]; f.t += 0.016;
-    if (f.t > 0.8) { floats.splice(i, 1); continue; }
-    ctx.fillStyle = f.color; ctx.font = "bold 16px ui-monospace, Menlo, monospace";
-    ctx.textAlign = "center"; ctx.globalAlpha = 1 - f.t / 0.8;
-    ctx.fillText(f.text, f.x, f.y - f.t * 40); ctx.globalAlpha = 1;
+  const m = MAPS[G.mapId];
+  const style = G.interior ? interiorStyle(G.interior.kind) : m.tileStyle;
+  drawSky(style);
+  drawFloor(style);
+  const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+  const depthBuf = renderWalls(walls);
+  renderSprites(depthBuf);
+  drawWeaponOverlay();
+  drawMinimap();
+  drawCrosshair();
+  if (G.hitFlash > 0) {
+    ctx.fillStyle = `rgba(220,40,40,${G.hitFlash * 0.4})`;
+    ctx.fillRect(0, 0, W, H);
   }
+  if (G.encounter) {
+    ctx.fillStyle = "rgba(220,70,70,0.85)";
+    ctx.font = "bold 13px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("⚔  COMBAT: " + G.encounter.label, W/2, 20);
+  }
+  drawCompass();
   updateHUD();
 }
 
-function renderTiles(map) {
+function interiorStyle(kind) {
+  const map = { cabin:"wood", bighouse:"wood", arena:"arena", lair:"cave", portal:"stone",
+                palace:"marble", temple:"marble", fortress:"stone", mess:"wood",
+                museum:"marble", hotel:"marble", station:"stone", bridge:"stone",
+                school:"wood", library:"wood", arch:"marble", garden:"grass",
+                mountain:"stone", shop:"wood", fields:"grass", river:"water",
+                throne:"marble", forge:"stone", spa:"marble", cave:"cave", cliff:"stone" };
+  return map[kind] || "stone";
+}
+
+function drawSky(style) {
   const ctx = G.ctx;
-  const style = TILE_STYLES[map.tileStyle] || TILE_STYLES.grass;
-  const cols = Math.ceil(W / TS), rows = Math.ceil(H / TS);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      ctx.fillStyle = style(c, r);
-      ctx.fillRect(c * TS, r * TS, TS, TS);
+  const palette = {
+    grass: ["#7ec0ff","#3a7ed0"], sand: ["#ffe0a0","#d49050"], water: ["#6ab0ff","#1e508a"],
+    city: ["#5a6a8a","#2a3050"], pavement: ["#7080a0","#3a4258"], cave: ["#1a0e18","#080308"],
+    shadow: ["#3a0a1a","#0a0005"], cloud: ["#ffffff","#c0d4ff"], stone: ["#5a6070","#2a3040"],
+    wood: ["#7ec0ff","#3a7ed0"], marble: ["#ffffff","#c0d4ff"], arena: ["#ffe0a0","#a05828"],
+    overworld: ["#7ec0ff","#4a8ed0"],
+  };
+  const [t, b] = palette[style] || palette.grass;
+  const grad = ctx.createLinearGradient(0, 0, 0, H/2);
+  grad.addColorStop(0, t); grad.addColorStop(1, b);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H/2);
+  // Celestial body
+  if (style === "cave" || style === "shadow") {
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath(); ctx.arc(W * 0.78, H * 0.15, 22, 0, Math.PI*2); ctx.fill();
+  } else if (style !== "stone" && style !== "wood") {
+    ctx.fillStyle = "rgba(255,240,160,0.45)";
+    ctx.beginPath(); ctx.arc(W * 0.18, H * 0.16, 30, 0, Math.PI*2); ctx.fill();
+  }
+  // Clouds
+  if (style === "grass" || style === "overworld" || style === "cloud" || style === "marble") {
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    for (let i = 0; i < 6; i++) {
+      const cx = (i * 220 + (performance.now()/100)) % (W + 200) - 100;
+      const cy = 40 + (i % 3) * 30;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 60, 14, 0, 0, Math.PI*2); ctx.fill();
     }
   }
-  // Subtle grid
-  ctx.strokeStyle = "rgba(0,0,0,0.08)";
-  ctx.lineWidth = 1;
-  for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(c*TS, 0); ctx.lineTo(c*TS, H); ctx.stroke(); }
-  for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(0, r*TS); ctx.lineTo(W, r*TS); ctx.stroke(); }
 }
 
-function renderBuilding(z) {
+function drawFloor(style) {
   const ctx = G.ctx;
-  // Floor inside
-  ctx.fillStyle = z.color;
-  ctx.fillRect(z.x, z.y, z.w, z.h);
-  // Roof shadow (top stripe)
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.fillRect(z.x, z.y, z.w, 12);
-  // Walls (block style)
-  const d = buildingDoor(z);
-  const walls = buildingWalls(z);
-  ctx.fillStyle = "#3a2a1a";
-  for (const r of walls) ctx.fillRect(r.x, r.y, r.w, r.h);
-  // Brick lines on top/bottom walls
-  ctx.strokeStyle = "rgba(255,255,255,0.10)";
-  for (let x = z.x + 4; x < z.x + z.w; x += 12) {
-    ctx.beginPath(); ctx.moveTo(x, z.y); ctx.lineTo(x, z.y + WALL_T); ctx.stroke();
+  const palette = {
+    grass: ["#3a6020","#1a3010"], sand: ["#b48a48","#7a5828"], water: ["#2a5878","#0a2840"],
+    city: ["#3a3a44","#1a1a22"], pavement: ["#50505a","#26262e"], cave: ["#251820","#100008"],
+    shadow: ["#1a0810","#050005"], cloud: ["#bcc4dd","#7a82a0"], stone: ["#404654","#1c2030"],
+    wood: ["#7a4a20","#3a200c"], marble: ["#d8d4c8","#6c6860"], arena: ["#a8783a","#4a2810"],
+    overworld: ["#3a6020","#1a3010"],
+  };
+  const [near, far] = palette[style] || palette.grass;
+  const grad = ctx.createLinearGradient(0, H/2, 0, H);
+  grad.addColorStop(0, far); grad.addColorStop(1, near);
+  ctx.fillStyle = grad; ctx.fillRect(0, H/2, W, H/2);
+  // Floor band texture lines
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  for (let i = 1; i < 12; i++) {
+    const y = H/2 + Math.pow(i / 12, 2) * (H/2);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
   }
-  // Door
-  ctx.fillStyle = "#1a0e08";
-  ctx.fillRect(d.x, d.y - 2, d.w, d.h + 2);
-  ctx.fillStyle = "#f0c050";
-  ctx.fillRect(d.x + d.w - 8, d.y + 2, 3, 6);
-  // Label above
-  ctx.fillStyle = "rgba(0,0,0,0.85)";
-  ctx.font = "bold 12px -apple-system, sans-serif";
-  ctx.textAlign = "center";
-  wrapText(ctx, z.name, z.x + z.w/2, z.y + 8, z.w - 8, 14, 2);
 }
 
-function renderOutdoorZone(z) {
+function renderWalls(walls) {
   const ctx = G.ctx;
-  const t = performance.now() / 700;
-  const pulse = 0.18 + 0.12 * (Math.sin(t + z.x*0.01) * 0.5 + 0.5);
-  ctx.fillStyle = z.color;
-  ctx.globalAlpha = 0.75;
-  roundRect(ctx, z.x, z.y, z.w, z.h, 12); ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = `rgba(255,255,255,${pulse})`;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = "rgba(0,0,0,0.85)";
-  ctx.font = "bold 16px -apple-system, sans-serif";
-  ctx.textAlign = "center";
-  wrapText(ctx, z.name, z.x + z.w/2, z.y + z.h/2 + 5, z.w - 12, 18);
+  const depth = new Array(NUM_RAYS).fill(Infinity);
+  const p = G.player;
+  for (let i = 0; i < NUM_RAYS; i++) {
+    const sx = i * RAY_STEP;
+    const screenT = sx / W;
+    const rayAngle = p.angle - HALF_FOV + screenT * FOV;
+    const hit = castRay(walls, p.x, p.y, rayAngle);
+    if (!hit) continue;
+    const perp = hit.dist * Math.cos(rayAngle - p.angle);
+    if (perp < 0.5) continue;
+    depth[i] = perp;
+    const lineH = Math.min(H * 4, (WALL_TALL * PROJ) / perp);
+    const top = (H - lineH) / 2;
+    let shade = Math.max(0.25, Math.min(1, 1 - perp / 900));
+    if (hit.vertical) shade *= 0.85;
+    ctx.fillStyle = shadeColor(hit.color, shade);
+    ctx.fillRect(sx, top, RAY_STEP, lineH);
+    // top highlight
+    ctx.fillStyle = shadeColor(hit.color, Math.min(1, shade * 1.4));
+    ctx.fillRect(sx, top, RAY_STEP, Math.max(2, lineH * 0.04));
+    // bottom shade
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillRect(sx, top + lineH - Math.max(2, lineH * 0.05), RAY_STEP, Math.max(2, lineH * 0.05));
+  }
+  return depth;
 }
 
-function renderPlay() {
+function renderSprites(depth) {
+  const ctx = G.ctx;
+  const p = G.player;
+  const arr = G.sprites.map(s => {
+    const dx = s.x - p.x, dy = s.y - p.y;
+    let ang = Math.atan2(dy, dx) - p.angle;
+    while (ang > Math.PI) ang -= Math.PI*2;
+    while (ang < -Math.PI) ang += Math.PI*2;
+    return { s, dist: Math.hypot(dx, dy), ang };
+  }).filter(o => Math.abs(o.ang) < HALF_FOV + 0.5 && o.dist > 4);
+  arr.sort((a,b) => b.dist - a.dist);
+  for (const o of arr) {
+    const s = o.s;
+    const perp = o.dist * Math.cos(o.ang);
+    if (perp < 1) continue;
+    const sizeW = (s.size || 24) * 2;
+    const sizeH = (s.height || sizeW);
+    const screenH = (sizeH * PROJ) / perp;
+    const screenW = (sizeW * PROJ) / perp;
+    const screenX = W/2 + (Math.tan(o.ang) * PROJ);
+    const screenY = H/2 + screenH/8 - screenH;  // anchor near floor
+    const left = screenX - screenW/2;
+    // depth check by column
+    const colStart = Math.max(0, Math.floor(left / RAY_STEP));
+    const colEnd = Math.min(NUM_RAYS - 1, Math.ceil((left + screenW) / RAY_STEP));
+    if (colEnd < 0 || colStart >= NUM_RAYS) continue;
+    // skip if entirely behind a wall
+    let visible = false;
+    for (let c = colStart; c <= colEnd; c++) if (depth[c] > perp + 1) { visible = true; break; }
+    if (!visible) continue;
+    drawSprite(ctx, s, left, screenY, screenW, screenH, perp);
+  }
+}
+
+function drawSprite(ctx, s, sx, sy, sw, sh, perp) {
+  // Shadow on floor
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.beginPath();
+  ctx.ellipse(sx + sw/2, sy + sh, sw * 0.45, sw * 0.12, 0, 0, Math.PI*2);
+  ctx.fill();
+  const k = s.kind;
+  if (k === "enemy" || k === "enemyPreview") drawCreature(ctx, s, sx, sy, sw, sh);
+  else if (k === "ally") drawAlly(ctx, s, sx, sy, sw, sh);
+  else if (k === "npc") drawHumanoid(ctx, s.color || "#7a4a2a", sx, sy, sw, sh);
+  else if (k === "pedestal") drawPedestal(ctx, s, sx, sy, sw, sh);
+  else if (k === "portal") drawPortal(ctx, s, sx, sy, sw, sh);
+  else if (k === "fountain") drawFountain(ctx, sx, sy, sw, sh);
+  else if (k === "ring") drawArenaRing(ctx, sx, sy, sw, sh);
+  else {
+    ctx.fillStyle = s.color || "#888";
+    ctx.fillRect(sx, sy + sh*0.3, sw, sh*0.7);
+  }
+  // Label + HP bar for living sprites
+  if ((k === "enemy" || k === "enemyPreview" || k === "ally") && s.hp !== undefined && s.deadT === undefined) {
+    const barY = sy - 6;
+    ctx.fillStyle = "#400";
+    ctx.fillRect(sx, barY, sw, 4);
+    ctx.fillStyle = k === "ally" ? "#5cd97e" : "#e04848";
+    ctx.fillRect(sx, barY, sw * (s.hp / s.maxHp), 4);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "bold 11px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`${s.name}${s.level ? ' L'+s.level : ''}`, sx + sw/2, barY - 4);
+  } else if (s.label) {
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = "bold 12px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(s.label, sx + sw/2, sy - 4);
+  }
+}
+
+function drawCreature(ctx, s, x, y, w, h) {
+  const shape = s.shape || "humanoid";
+  if (shape === "humanoid") drawHumanoid(ctx, s.color, x, y, w, h);
+  else if (shape === "beast") drawBeast(ctx, s.color, x, y, w, h);
+  else if (shape === "ghost") drawGhost(ctx, s.color, x, y, w, h);
+  else if (shape === "bug") drawBug(ctx, s.color, x, y, w, h);
+  else if (shape === "cyclops") drawCyclops(ctx, s.color, x, y, w, h);
+  else if (shape === "snake") drawSnake(ctx, s.color, x, y, w, h);
+  else drawHumanoid(ctx, s.color, x, y, w, h);
+}
+function drawHumanoid(ctx, color, x, y, w, h) {
+  // Legs
+  ctx.fillStyle = shadeColor(color, 0.6);
+  ctx.fillRect(x + w*0.3, y + h*0.7, w*0.15, h*0.3);
+  ctx.fillRect(x + w*0.55, y + h*0.7, w*0.15, h*0.3);
+  // Body
+  ctx.fillStyle = color;
+  ctx.fillRect(x + w*0.25, y + h*0.3, w*0.5, h*0.45);
+  // Arms
+  ctx.fillStyle = shadeColor(color, 1.1);
+  ctx.fillRect(x + w*0.1, y + h*0.35, w*0.15, h*0.3);
+  ctx.fillRect(x + w*0.75, y + h*0.35, w*0.15, h*0.3);
+  // Head
+  ctx.fillStyle = "#f0c98e";
+  ctx.beginPath(); ctx.arc(x + w/2, y + h*0.18, w*0.18, 0, Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x + w*0.42, y + h*0.16, w*0.05, h*0.025);
+  ctx.fillRect(x + w*0.53, y + h*0.16, w*0.05, h*0.025);
+}
+function drawBeast(ctx, color, x, y, w, h) {
+  // Body (low and wide)
+  ctx.fillStyle = color;
+  ctx.fillRect(x + w*0.1, y + h*0.55, w*0.8, h*0.3);
+  // Legs
+  ctx.fillStyle = shadeColor(color, 0.7);
+  for (let i = 0; i < 4; i++) ctx.fillRect(x + w*(0.15 + i*0.22), y + h*0.85, w*0.08, h*0.15);
+  // Head
+  ctx.fillStyle = color;
+  ctx.fillRect(x + w*0.05, y + h*0.45, w*0.25, h*0.18);
+  // Eyes
+  ctx.fillStyle = "#ff4040";
+  ctx.fillRect(x + w*0.09, y + h*0.49, w*0.04, h*0.03);
+  ctx.fillRect(x + w*0.17, y + h*0.49, w*0.04, h*0.03);
+  // Tail
+  ctx.fillStyle = color;
+  ctx.fillRect(x + w*0.85, y + h*0.5, w*0.12, h*0.05);
+}
+function drawGhost(ctx, color, x, y, w, h) {
+  ctx.fillStyle = `rgba(${parseColor(color).r},${parseColor(color).g},${parseColor(color).b},0.7)`;
+  ctx.beginPath();
+  ctx.ellipse(x + w/2, y + h*0.5, w*0.4, h*0.4, 0, 0, Math.PI*2);
+  ctx.fill();
+  // Wisp tail
+  ctx.beginPath();
+  ctx.moveTo(x + w*0.2, y + h*0.7);
+  ctx.quadraticCurveTo(x + w*0.5, y + h, x + w*0.8, y + h*0.7);
+  ctx.lineTo(x + w*0.7, y + h*0.55);
+  ctx.lineTo(x + w*0.3, y + h*0.55);
+  ctx.closePath();
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x + w*0.38, y + h*0.4, w*0.08, h*0.04);
+  ctx.fillRect(x + w*0.54, y + h*0.4, w*0.08, h*0.04);
+}
+function drawBug(ctx, color, x, y, w, h) {
+  // Body
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.65, w*0.35, h*0.3, 0, 0, Math.PI*2); ctx.fill();
+  // Head
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.35, w*0.22, h*0.2, 0, 0, Math.PI*2); ctx.fill();
+  // Legs
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath(); ctx.moveTo(x + w*0.3, y + h*0.6); ctx.lineTo(x + w*0.05, y + h*(0.7 + i*0.1)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + w*0.7, y + h*0.6); ctx.lineTo(x + w*0.95, y + h*(0.7 + i*0.1)); ctx.stroke();
+  }
+  // Eyes
+  ctx.fillStyle = "#ff6";
+  ctx.fillRect(x + w*0.44, y + h*0.32, w*0.05, h*0.04);
+  ctx.fillRect(x + w*0.51, y + h*0.32, w*0.05, h*0.04);
+}
+function drawCyclops(ctx, color, x, y, w, h) {
+  drawHumanoid(ctx, color, x, y, w, h);
+  // Overdraw single big eye
+  ctx.fillStyle = "#fff";
+  ctx.beginPath(); ctx.arc(x + w/2, y + h*0.17, w*0.12, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#a00";
+  ctx.beginPath(); ctx.arc(x + w/2, y + h*0.17, w*0.05, 0, Math.PI*2); ctx.fill();
+}
+function drawSnake(ctx, color, x, y, w, h) {
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let t = 0; t <= 1; t += 0.05) {
+    const yy = y + h * (0.3 + t * 0.6);
+    const xx = x + w/2 + Math.sin(t * Math.PI * 3) * w * 0.25;
+    if (t === 0) ctx.moveTo(xx - w*0.12, yy); else ctx.lineTo(xx - w*0.12, yy);
+  }
+  for (let t = 1; t >= 0; t -= 0.05) {
+    const yy = y + h * (0.3 + t * 0.6);
+    const xx = x + w/2 + Math.sin(t * Math.PI * 3) * w * 0.25;
+    ctx.lineTo(xx + w*0.12, yy);
+  }
+  ctx.closePath(); ctx.fill();
+  // Head
+  ctx.beginPath(); ctx.arc(x + w/2 + Math.sin(0) * w*0.25, y + h*0.25, w*0.16, 0, Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle = "#ff4";
+  ctx.fillRect(x + w*0.45, y + h*0.23, w*0.04, h*0.03);
+  ctx.fillRect(x + w*0.52, y + h*0.23, w*0.04, h*0.03);
+}
+function drawAlly(ctx, s, x, y, w, h) {
+  drawHumanoid(ctx, s.color || "#d4a040", x, y, w, h);
+  // Green outline
+  ctx.strokeStyle = "#5cd97e"; ctx.lineWidth = 2;
+  ctx.strokeRect(x + w*0.2, y + h*0.25, w*0.6, h*0.7);
+}
+function drawPedestal(ctx, s, x, y, w, h) {
+  // Glow
+  const t = performance.now() / 300;
+  ctx.fillStyle = `rgba(255,210,80,${0.18 + 0.18 * Math.sin(t)})`;
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.45, w*0.7, h*0.3, 0, 0, Math.PI*2); ctx.fill();
+  // Pillar
+  ctx.fillStyle = "#7a5a30";
+  ctx.fillRect(x + w*0.3, y + h*0.5, w*0.4, h*0.5);
+  ctx.fillStyle = "#5a3a18";
+  ctx.fillRect(x + w*0.25, y + h*0.45, w*0.5, h*0.07);
+  // Item floating
+  ctx.fillStyle = s.color || "#ffe040";
+  ctx.fillRect(x + w*0.42, y + h*0.18, w*0.16, h*0.32);
+  ctx.fillStyle = "rgba(255,255,180,0.7)";
+  ctx.fillRect(x + w*0.45, y + h*0.18, w*0.10, h*0.04);
+}
+function drawPortal(ctx, s, x, y, w, h) {
+  const t = performance.now() / 200;
+  for (let i = 3; i >= 0; i--) {
+    ctx.fillStyle = `rgba(120,160,255,${0.15 + 0.1*Math.sin(t + i)})`;
+    ctx.beginPath(); ctx.ellipse(x + w/2, y + h/2, w*(0.35 + i*0.07), h*(0.45 + i*0.05), 0, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.fillStyle = s.color || "#5070d0";
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h/2, w*0.32, h*0.4, 0, 0, Math.PI*2); ctx.fill();
+  // Swirl
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let a = 0; a < Math.PI * 4; a += 0.2) {
+    const rad = a * 4;
+    const px = x + w/2 + Math.cos(a + t) * rad * 0.05 * w/100;
+    const py = y + h/2 + Math.sin(a + t) * rad * 0.05 * h/100;
+    if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+function drawFountain(ctx, x, y, w, h) {
+  const t = performance.now() / 200;
+  ctx.fillStyle = "#5080a0";
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.7, w*0.45, h*0.18, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = `rgba(120,200,255,${0.5 + 0.2*Math.sin(t)})`;
+  ctx.fillRect(x + w*0.45, y + h*0.2, w*0.1, h*0.5);
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3 + t;
+    ctx.beginPath();
+    ctx.arc(x + w/2 + Math.cos(a) * w*0.2, y + h*0.4 + Math.sin(a) * h*0.1, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+function drawArenaRing(ctx, x, y, w, h) {
+  ctx.fillStyle = "rgba(255,180,80,0.2)";
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.7, w*0.5, h*0.4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = "#e8a050"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.7, w*0.5, h*0.4, 0, 0, Math.PI*2); ctx.stroke();
+}
+
+// ===== WEAPON OVERLAY =====
+function drawWeaponOverlay() {
+  const ctx = G.ctx;
+  const w = WEAPONS[G.player.weapon];
+  const t = G.swing ? G.swing.t / w.cd : 0;
+  const swingY = G.swing ? -Math.sin(t * Math.PI) * 60 : 0;
+  const swingX = G.swing ? Math.cos(t * Math.PI - Math.PI/2) * 40 : 0;
+  ctx.save();
+  ctx.translate(W * 0.7 + swingX, H + swingY);
+  ctx.rotate(-0.3 + (G.swing ? t * 0.8 : 0));
+  // Hand
+  ctx.fillStyle = "#f0c98e";
+  ctx.fillRect(-15, -40, 30, 40);
+  // Weapon
+  if (w.ranged) {
+    ctx.fillStyle = "#5a3a1a";
+    ctx.fillRect(-4, -180, 8, 150);
+    ctx.strokeStyle = "#aaa"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-4, -180); ctx.lineTo(-4, -30); ctx.stroke();
+  } else {
+    // Blade
+    ctx.fillStyle = w.dmg >= 20 ? "#ffd060" : w.dmg >= 14 ? "#c0c0e8" : "#a8a8b8";
+    ctx.fillRect(-4, -170, 8, 140);
+    // Hilt
+    ctx.fillStyle = "#5a3a1a";
+    ctx.fillRect(-12, -40, 24, 10);
+    ctx.fillRect(-3, -30, 6, 6);
+  }
+  ctx.restore();
+}
+
+// ===== MINIMAP =====
+function drawMinimap() {
   const ctx = G.ctx;
   const m = MAPS[G.mapId];
-  renderTiles(m);
-  // Map label faint
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
-  ctx.font = "bold 36px -apple-system, sans-serif";
-  ctx.textAlign = "right";
-  ctx.fillText(m.label, W - 16, H - 18);
-  // Esc hint
-  if (m.parent) {
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "12px -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Esc — back to " + MAPS[m.parent].label, 12, H - 10);
-  }
-  // Zones / buildings
-  for (const z of m.subzones) {
-    if (z.outdoor) renderOutdoorZone(z);
-    else renderBuilding(z);
-  }
-  // Half-Blood Hill marker
-  if (G.mapId === "camp-hb") {
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    ctx.font = "italic 12px -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Half-Blood Hill", 480, 525);
-    // hill mound
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.beginPath(); ctx.ellipse(480, 555, 80, 16, 0, 0, Math.PI*2); ctx.fill();
-  }
-  drawPlayer(ctx);
-}
-
-function renderInterior() {
-  const ctx = G.ctx;
-  const inter = G.interior;
-  // Dark surround
-  ctx.fillStyle = "#0a0810";
-  ctx.fillRect(0, 0, W, H);
-  // Floor — wood/stone based on zone type
-  const floorStyle = ({
-    cabin: "wood", bighouse: "wood", arena: "arena", lair: "cave",
-    portal: "stone", palace: "marble", temple: "marble", fortress: "stone",
-    mess: "wood", museum: "marble", hotel: "marble", station: "stone",
-    bridge: "stone", school: "wood", library: "wood",
-    arch: "marble", garden: "grass", mountain: "stone",
-    shop: "wood", fields: "grass", river: "water", throne: "marble",
-    forge: "stone", spa: "marble", cave: "cave", cliff: "stone",
-  })[inter.kind] || "stone";
-  const style = TILE_STYLES[floorStyle];
-  const cols = Math.ceil(IW / TS), rows = Math.ceil(IH / TS);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      ctx.fillStyle = style(c, r);
-      const x = IX + c * TS, y = IY + r * TS;
-      ctx.fillRect(x, y, Math.min(TS, IX + IW - x), Math.min(TS, IY + IH - y));
-    }
-  }
-  // Grid
-  ctx.strokeStyle = "rgba(0,0,0,0.10)";
-  for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(IX + c*TS, IY); ctx.lineTo(IX + c*TS, IY + IH); ctx.stroke(); }
-  for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(IX, IY + r*TS); ctx.lineTo(IX + IW, IY + r*TS); ctx.stroke(); }
+  const mapW = G.interior ? G.interior.w : mapBounds(m).w;
+  const mapH = G.interior ? G.interior.h : mapBounds(m).h;
+  const mmSize = 140;
+  const margin = 14;
+  const mmX = W - mmSize - margin, mmY = margin + 60;
+  const scale = mmSize / Math.max(mapW, mapH);
+  // Background
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(mmX, mmY, mmSize, mmSize);
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.strokeRect(mmX, mmY, mmSize, mmSize);
   // Walls
-  ctx.fillStyle = "#3a2a1a";
-  for (const w of inter.walls) ctx.fillRect(w.x, w.y, w.w, w.h);
-  // Banner
-  if (inter.banner) {
-    ctx.fillStyle = "rgba(0,0,0,0.55)";
-    ctx.font = "bold 22px -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(inter.banner, IX + IW/2, IY + 30);
-  }
-  // Door
-  const d = inter.door;
-  ctx.fillStyle = "#2a1a0a";
-  ctx.fillRect(d.x, d.y - 2, d.w, d.h + 4);
-  ctx.fillStyle = "rgba(255,220,140,0.6)";
-  ctx.font = "11px -apple-system, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Door (step out)", d.x + d.w/2, d.y + d.h + 16);
-  // Objects
-  const tpulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
-  for (const o of inter.objects) {
-    if (o.kind === "decor") {
-      ctx.fillStyle = o.color;
-      ctx.fillRect(o.x, o.y, o.w, o.h);
-      ctx.strokeStyle = "rgba(0,0,0,0.3)";
-      ctx.strokeRect(o.x, o.y, o.w, o.h);
-      if (o.label) {
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.font = "10px -apple-system, sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(o.label, o.x + o.w/2, o.y + o.h/2 + 3);
+  if (!G.interior) {
+    for (const z of m.subzones) {
+      ctx.fillStyle = z.outdoor ? "rgba(255,255,255,0.15)" : "rgba(255,200,140,0.5)";
+      ctx.fillRect(mmX + z.x * scale, mmY + z.y * scale, z.w * scale, z.h * scale);
+      if (!z.outdoor) {
+        const d = buildingDoor(z);
+        ctx.fillStyle = "#ffd060";
+        ctx.fillRect(mmX + d.x * scale, mmY + d.y * scale, d.w * scale, d.h * scale + 1);
       }
-    } else if (o.kind === "pedestal") {
-      // glow
-      ctx.fillStyle = `rgba(255,220,80,${0.2 + 0.2*tpulse})`;
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, 50, 0, Math.PI*2); ctx.fill();
-      // base
-      ctx.fillStyle = "#7a5a30";
-      ctx.fillRect(o.x, o.y + o.h - 20, o.w, 20);
-      // item
-      ctx.fillStyle = o.color;
-      ctx.fillRect(o.x + o.w/2 - 14, o.y + 10, 28, o.h - 30);
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.label, o.x + o.w/2, o.y - 6);
-    } else if (o.kind === "npc") {
-      ctx.fillStyle = o.color;
-      roundRect(ctx, o.x, o.y, o.w, o.h, 6); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + 10, 4, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.label, o.x + o.w/2, o.y - 6);
-    } else if (o.kind === "monster") {
-      ctx.fillStyle = o.color;
-      roundRect(ctx, o.x, o.y, o.w, o.h, 4); ctx.fill();
-      ctx.strokeStyle = "#ff6060";
-      ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = "#ffb0b0";
-      ctx.font = "10px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.name, o.x + o.w/2, o.y - 4);
-    } else if (o.kind === "ring") {
-      ctx.fillStyle = "rgba(255,180,80,0.18)";
-      ctx.fillRect(o.x, o.y, o.w, o.h);
-      ctx.strokeStyle = "#e8a050";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(o.x, o.y, o.w, o.h);
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "bold 12px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.label, o.x + o.w/2, o.y + o.h/2 + 4);
-    } else if (o.kind === "portal") {
-      ctx.fillStyle = `rgba(100,140,255,${0.3 + 0.3*tpulse})`;
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, 55, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = o.color;
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, 35, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.label, o.x + o.w/2, o.y - 6);
-    } else if (o.kind === "fountain") {
-      ctx.fillStyle = `rgba(120,200,255,${0.3 + 0.3*tpulse})`;
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, 50, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#6090c0";
-      ctx.beginPath(); ctx.arc(o.x + o.w/2, o.y + o.h/2, 30, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px -apple-system, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(o.label, o.x + o.w/2, o.y - 6);
     }
+  } else {
+    ctx.fillStyle = "rgba(255,200,140,0.5)";
+    for (const wl of G.interior.walls) ctx.fillRect(mmX + wl.x * scale, mmY + wl.y * scale, Math.max(1,wl.w*scale), Math.max(1,wl.h*scale));
+    const d = G.interior.door;
+    ctx.fillStyle = "#ffd060";
+    ctx.fillRect(mmX + d.x * scale, mmY + d.y * scale, d.w * scale, d.h * scale + 1);
   }
-  // Esc / leave hint
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.font = "12px -apple-system, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("Esc — leave " + inter.zone.name, IX + 12, IY + IH + 28);
+  // Sprites
+  for (const s of G.sprites) {
+    ctx.fillStyle = s.kind === "enemy" || s.kind === "enemyPreview" ? "#e04848"
+                   : s.kind === "ally" ? "#5cd97e"
+                   : "#80c0ff";
+    const sx = mmX + s.x * scale, sy = mmY + s.y * scale;
+    ctx.fillRect(sx - 2, sy - 2, 4, 4);
+  }
   // Player
-  drawPlayer(ctx);
-}
-
-function renderCombat() {
-  const ctx = G.ctx;
-  ctx.fillStyle = "#1a1424"; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#251934";
-  for (let i = 0; i < 30; i++) for (let j = 0; j < 18; j++) if ((i + j) % 2 === 0) ctx.fillRect(i * 32, j * 32 + 40, 32, 32);
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.font = "bold 14px -apple-system, sans-serif"; ctx.textAlign = "center";
-  ctx.fillText(G.combat.label, W/2, 28);
-  for (const e of G.entities) {
-    if (e.deadT !== undefined) ctx.globalAlpha = Math.max(0, 1 - e.deadT / 0.35);
-    ctx.fillStyle = e.color; roundRect(ctx, e.x, e.y, e.w, e.h, 4); ctx.fill();
-    if (e.ally) { ctx.strokeStyle = "#80f0a0"; ctx.lineWidth = 2; ctx.stroke(); }
-    if (!e.dead) {
-      const barW = Math.max(28, e.w);
-      ctx.fillStyle = "#3a0a0a";
-      ctx.fillRect(e.x - (barW - e.w)/2, e.y - 8, barW, 4);
-      ctx.fillStyle = e.ally ? "#5cd97e" : "#e04848";
-      ctx.fillRect(e.x - (barW - e.w)/2, e.y - 8, barW * (e.hp/e.maxHp), 4);
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      ctx.font = "10px -apple-system, sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(`${e.name} L${e.level}`, e.x + e.w/2, e.y - 12);
-    }
-    ctx.globalAlpha = 1;
-  }
-  drawPlayer(ctx);
-  if (G.swing) {
-    const p = G.player; const w = WEAPONS[G.swing.weapon];
-    const dlen = Math.hypot(G.swing.dx, G.swing.dy) || 1;
-    const ax = G.swing.dx / dlen, ay = G.swing.dy / dlen;
-    const cx = p.x + p.w/2, cy = p.y + p.h/2;
-    const tr = G.swing.t / w.cd;
-    ctx.save(); ctx.translate(cx, cy);
-    ctx.rotate(Math.atan2(ay, ax));
-    ctx.strokeStyle = w.ranged ? "#a0e0ff" : "#ffe898";
-    ctx.lineWidth = w.ranged ? 2 : 4;
-    ctx.globalAlpha = 1 - tr;
-    ctx.beginPath();
-    if (w.ranged) { ctx.moveTo(0, 0); ctx.lineTo(w.reach * (tr*1.5), 0); }
-    else { const arc = Math.PI/3; ctx.arc(0, 0, w.reach, -arc/2 + tr*arc, arc/2); }
-    ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1;
-  }
-  ctx.fillStyle = "rgba(255,255,255,0.4)";
-  ctx.font = "11px -apple-system, sans-serif"; ctx.textAlign = "left";
-  ctx.fillText("(flee with Esc — combat will end)", 10, H - 10);
-}
-
-function drawPlayer(ctx) {
-  const p = G.player;
-  // Shadow
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
-  ctx.beginPath(); ctx.ellipse(p.x + p.w/2, p.y + p.h + 4, p.w/2, 4, 0, 0, Math.PI*2); ctx.fill();
-  // Body
-  ctx.fillStyle = "#5fb8ff";
-  roundRect(ctx, p.x, p.y, p.w, p.h, 4); ctx.fill();
-  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
-  // Facing dot
-  const cx = p.x + p.w/2, cy = p.y + p.h/2;
+  const px = mmX + G.player.x * scale, py = mmY + G.player.y * scale;
   ctx.fillStyle = "#fff";
-  ctx.beginPath(); ctx.arc(cx + p.dir.x * 7, cy + p.dir.y * 7, 2, 0, Math.PI*2); ctx.fill();
-  if (p.frozenT > 0) {
-    ctx.strokeStyle = "#80d0ff"; ctx.lineWidth = 2;
-    ctx.strokeRect(p.x - 3, p.y - 3, p.w + 6, p.h + 6);
-  }
+  ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+  // Facing line
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(px, py);
+  ctx.lineTo(px + Math.cos(G.player.angle) * 10, py + Math.sin(G.player.angle) * 10);
+  ctx.stroke();
+  // Label
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "10px -apple-system, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Map", mmX + 4, mmY + 12);
 }
 
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
+function drawCrosshair() {
+  const ctx = G.ctx;
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W/2 - 8, H/2); ctx.lineTo(W/2 + 8, H/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2, H/2 - 8); ctx.lineTo(W/2, H/2 + 8); ctx.stroke();
 }
-function wrapText(ctx, text, x, y, maxW, lh, maxLines) {
-  const words = text.split(" ");
-  let line = "", lines = [];
-  for (let w of words) {
-    const test = line ? line + " " + w : w;
-    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
-    else line = test;
-  }
-  if (line) lines.push(line);
-  if (maxLines) lines = lines.slice(0, maxLines);
-  const start = y - (lines.length - 1) * lh / 2;
-  lines.forEach((l, i) => ctx.fillText(l, x, start + i * lh));
+
+function drawCompass() {
+  const ctx = G.ctx;
+  // small compass below minimap
+  const cx = W - 80, cy = 224;
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.font = "10px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  // N is angle = -PI/2 (up in source coords), but player angle is direction of motion
+  ctx.fillText("N", cx, cy - 8);
+  ctx.fillText("S", cx, cy + 14);
+  ctx.fillText("W", cx - 13, cy + 4);
+  ctx.fillText("E", cx + 13, cy + 4);
+  // needle
+  ctx.strokeStyle = "#ff4040"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(G.player.angle) * 14, cy + Math.sin(G.player.angle) * 14);
+  ctx.stroke();
 }
 
 // ===== LOOP =====
 function loop(t) {
   const dt = Math.min(0.05, (t - G.lastT) / 1000) || 0;
   G.lastT = t;
-  if (G.mode === "play") updatePlay(dt);
-  else if (G.mode === "interior") updateInterior(dt);
-  else if (G.mode === "combat") updateCombat(dt);
+  update(dt);
   render();
   G.pressedThisFrame = {};
   requestAnimationFrame(loop);
@@ -1530,13 +1524,10 @@ function init() {
   if (!load()) {
     G.player = defaultPlayer();
     G.mapId = "camp-hb";
-    toast("Welcome to The Arena. You spawn at Half-Blood Hill.", "info");
-  } else {
-    toast("Save loaded.", "info");
-  }
+    toast("Welcome to The Arena. WASD/Arrows to move and turn.", "info");
+  } else toast("Save loaded.", "info");
   if (!MAPS[G.mapId]) G.mapId = "camp-hb";
-  G.player.x = G.player.x || MAPS[G.mapId].spawn.x;
-  G.player.y = G.player.y || MAPS[G.mapId].spawn.y;
+  if (typeof G.player.angle !== "number") G.player.angle = -Math.PI / 2;
   requestAnimationFrame(loop);
 }
 document.addEventListener("DOMContentLoaded", init);
