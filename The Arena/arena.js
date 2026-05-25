@@ -415,31 +415,23 @@ function defaultPlayer() {
 }
 
 // ===== SAVE / LOAD =====
+// Saving is disabled — every session is a fresh run from Half-Blood Hill.
+// We still wipe any prior localStorage so old broken saves can't trap players.
 const SAVE_KEY = "theArena.save.v3";
-function save() {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ player: G.player, mapId: G.mapId }));
-  } catch (e) {}
-}
+function save() { /* no-op: progress does not persist */ }
 function load() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
-    G.player = Object.assign(defaultPlayer(), d.player || {});
-    G.mapId = d.mapId || "camp-hb";
-    return true;
-  } catch (e) { return false; }
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  return false;
 }
 function resetSave() {
-  localStorage.removeItem(SAVE_KEY);
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
   G.player = defaultPlayer();
   G.mapId = "camp-hb";
   G.interior = null;
   G.encounter = null;
   G.sprites = [];
   enterMap("camp-hb");
-  toast("New game started.", "info"); save();
+  toast("New game started.", "info");
 }
 
 // ===== TOAST / HUD =====
@@ -2506,13 +2498,12 @@ function init() {
   G.toastStack = document.getElementById("toast-stack");
   G.overlay = document.getElementById("overlay");
   G.overlayPanel = document.getElementById("overlay-panel");
-  document.getElementById("reset-btn").onclick = () => { if (confirm("Erase your save and start a new game?")) resetSave(); };
+  document.getElementById("reset-btn").onclick = () => { if (confirm("Restart from Half-Blood Hill?")) resetSave(); };
   setupInput();
-  if (!load()) {
-    G.player = defaultPlayer();
-    G.mapId = "camp-hb";
-    toast("Welcome to The Arena. WASD/Arrows to move and turn.", "info");
-  } else toast("Save loaded.", "info");
+  load(); // wipes any stale localStorage; always returns false now
+  G.player = defaultPlayer();
+  G.mapId = "camp-hb";
+  toast("Welcome to The Arena. WASD/Arrows to move and turn.", "info");
   if (!MAPS[G.mapId]) G.mapId = "camp-hb";
   if (typeof G.player.angle !== "number") G.player.angle = -Math.PI / 2;
   // Clean stale runtime state that shouldn't persist between sessions
