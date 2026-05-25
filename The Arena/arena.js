@@ -132,27 +132,43 @@ function lcg(seed) {
   let s = seed >>> 0;
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
-function cityApartments(seedName, count, srcW, srcH) {
+function cityApartments(seedName, count, srcW, srcH, fixedZones, safeZone) {
   const seed = Array.from(seedName).reduce((a,c)=>a*31 + c.charCodeAt(0), 7);
   const r = lcg(seed);
   const out = [];
   const colors = ["#6a5a4a","#7a6a5a","#5a5054","#85756a","#4a4248","#9a7a6a","#605860","#8c7a68","#3a4048","#74646a"];
+  function overlaps(bx, by, bw, bh) {
+    const pad = 24;
+    if (safeZone &&
+        bx + bw > safeZone.x - pad && bx < safeZone.x + safeZone.w + pad &&
+        by + bh > safeZone.y - pad && by < safeZone.y + safeZone.h + pad) return true;
+    for (const z of (fixedZones || [])) {
+      if (bx + bw > z.x - pad && bx < z.x + z.w + pad &&
+          by + bh > z.y - pad && by < z.y + z.h + pad) return true;
+    }
+    for (const p of out) {
+      if (bx + bw > p._sx - pad && bx < p._sx + p._sw + pad &&
+          by + bh > p._sy - pad && by < p._sy + p._sh + pad) return true;
+    }
+    return false;
+  }
   for (let i = 0; i < count; i++) {
     let bx, by, bw, bh, tries = 0;
-    do {
+    while (tries < 60) {
       bw = 80 + Math.floor(r() * 120);
       bh = 80 + Math.floor(r() * 120);
       bx = 20 + Math.floor(r() * (srcW - bw - 40));
       by = 20 + Math.floor(r() * (srcH - bh - 40));
       tries++;
-    } while (tries < 12);
+      if (!overlaps(bx, by, bw, bh)) break;
+    }
+    if (tries >= 60) continue;          // skip if no clear spot found
     out.push({
-      id: `apt${seedName}${i}`,
-      name: `Apt ${i+1}`,
+      id: `apt${seedName}${i}`, name: `Apt ${i+1}`,
       ...pos(bx, by, bw, bh),
+      _sx: bx, _sy: by, _sw: bw, _sh: bh,  // store source coords for overlap math
       color: colors[i % colors.length],
       interior: "hotel",
-      // apartments are non-interactive: no door is opened (action.type "none" handled like a wall)
       apartment: true,
       action: { type: "none" },
     });
@@ -262,7 +278,11 @@ const MAPS = {
       { id:"library",      name:"NY Public Library",  ...pos(1180, 220, 260, 160), color:"#b89870", interior:"library", action:{ type:"fight", mons:["dracaena","dracaena","dracaena"], packBonus:true, allyIfFlag:"automatons", unlock:"beckendorf", reqInfo:"Lion statue helps if you have automatons. Unlocks Beckendorf." } },
       { id:"esb",          name:"Empire State Bldg",  ...pos(1500, 340, 200, 220), color:"#7080a0", interior:"portal",  action:{ type:"goto",  to:"olympus", achievement:"ascension" } },
       // Apartment buildings — decorative, no door, just obstacles to make the city harder to navigate
-      ...cityApartments("manhattan", 22, 1800, 1400),
+      ...cityApartments("manhattan", 22, 1800, 1400, [
+        {x:60,y:80,w:320,h:200},{x:640,y:120,w:220,h:140},{x:280,y:460,w:240,h:160},
+        {x:900,y:580,w:280,h:180},{x:1320,y:980,w:380,h:140},{x:620,y:800,w:220,h:140},
+        {x:1180,y:220,w:260,h:160},{x:1500,y:340,w:200,h:220},
+      ], { x: 820, y: 1240, w: 200, h: 200 }),
     ],
     adjacency: { N: "camp-hb", E: "vegas" },
   },
@@ -275,7 +295,9 @@ const MAPS = {
       { id:"arch",   name:"Gateway Arch", ...pos(180, 120, 240, 280), color:"#b8b8b8", interior:"arch",  action:{ type:"fight", mons:["chimera","echidna"], unlock:"frank", reqInfo:"Defeat Chimera & Echidna to unlock Frank." } },
       { id:"garden", name:"Auntie Em's",  ...pos(820, 480, 260, 260), color:"#7aa84a", interior:"garden", action:{ type:"fight", mons:["medusa"], unlock:"grover", reqInfo:"Defeat Medusa to unlock Grover." } },
       { id:"lotus",  name:"Lotus Hotel",  ...pos(1380, 220, 320, 320), color:"#e0a8d8", interior:"hotel",  action:{ type:"fight", mons:Array(10).fill("lotus"), unlock:"piper", reqInfo:"Win against 10 lotus eaters to unlock Piper." } },
-      ...cityApartments("vegas", 18, 1800, 1300),
+      ...cityApartments("vegas", 18, 1800, 1300, [
+        {x:180,y:120,w:240,h:280},{x:820,y:480,w:260,h:260},{x:1380,y:220,w:320,h:320},
+      ], { x: 820, y: 1140, w: 200, h: 200 }),
     ],
     adjacency: { N: "long-island", W: "manhattan", E: "la" },
   },
@@ -289,7 +311,10 @@ const MAPS = {
       { id:"mt-diablo", name:"Mount Diablo",             ...pos(560, 180, 260, 320), color:"#a04030", interior:"mountain", action:{ type:"fight", mons:["enceladus"], unlock:"leo", reqInfo:"Defeat Enceladus to unlock Leo." } },
       { id:"crusty",    name:"Crusty's Waterbed Palace", ...pos(1140, 580, 240, 240), color:"#aaa",    interior:"shop",     action:{ type:"fight", mons:["procrustes"], unlock:"bianca", reqInfo:"Defeat Procrustes to unlock Bianca." } },
       { id:"doa",       name:"D.O.A. Studio",            ...pos(1480, 220, 200, 280), color:"#1a1a1a", interior:"portal",   action:{ type:"goto",  to:"underworld",   achievement:"ghostKing" } },
-      ...cityApartments("la", 18, 1800, 1300),
+      ...cityApartments("la", 18, 1800, 1300, [
+        {x:60,y:120,w:260,h:320},{x:560,y:180,w:260,h:320},
+        {x:1140,y:580,w:240,h:240},{x:1480,y:220,w:200,h:280},
+      ], { x: 820, y: 1140, w: 200, h: 200 }),
     ],
     adjacency: { N: "camp-j", W: "vegas" },
   },
@@ -836,7 +861,23 @@ function enterMap(id) {
   spawnAmbient(m);
   G.mode = "play";
   G.exitCooldown = 0.6;
+  ensurePlayerClear();
   save();
+}
+
+// If the player is stuck inside a wall (e.g. random apartment overlap on a city
+// spawn), spiral outward looking for a clear spot.
+function ensurePlayerClear() {
+  const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+  if (!collidesCircle(walls, G.player.x, G.player.y, PLAYER_R)) return;
+  for (let r = 24; r < 800; r += 24) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const nx = G.player.x + Math.cos(a) * r;
+      const ny = G.player.y + Math.sin(a) * r;
+      if (!collidesCircle(walls, nx, ny, PLAYER_R)) { G.player.x = nx; G.player.y = ny; return; }
+    }
+  }
 }
 
 function transitionEdge(toMapId, fromDir) {
@@ -855,6 +896,7 @@ function transitionEdge(toMapId, fromDir) {
   spawnAmbient(m);
   G.mode = "play";
   G.exitCooldown = 0.8;
+  ensurePlayerClear();
   toast(`Entered ${m.label}`, "info");
   save();
 }
@@ -2439,6 +2481,14 @@ function init() {
   } else toast("Save loaded.", "info");
   if (!MAPS[G.mapId]) G.mapId = "camp-hb";
   if (typeof G.player.angle !== "number") G.player.angle = -Math.PI / 2;
+  // Populate sprites for the current map (so we have scenery + ambient on load).
+  // Don't reset position here — the player's saved position is what they expect.
+  const m = MAPS[G.mapId];
+  G.sprites = getSceneryFor(m).slice();
+  spawnWanderers(m);
+  spawnAmbient(m);
+  // If they got stuck inside a wall on a previous build, free them.
+  ensurePlayerClear();
   requestAnimationFrame(loop);
 }
 document.addEventListener("DOMContentLoaded", init);
