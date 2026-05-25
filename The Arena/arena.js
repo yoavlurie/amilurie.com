@@ -70,6 +70,9 @@ const MONSTERS = {
   ares:       { name: "Ares",        level: 6, color: "#c02020", shape: "humanoid" },
   octavian:   { name: "Octavian",    level: 2, color: "#cfb98f", shape: "humanoid" },
   legion:     { name: "Roman Legionnaire", level: 3, color: "#a04030", shape: "humanoid" },
+  pitScorpion:   { name: "Pit Scorpion",   level: 2, color: "#3a2418", shape: "bug" },
+  tinyScorpion:  { name: "Tiny Scorpion",  level: 1, color: "#5a3018", shape: "bug", hpMod: 0.5, dmgMod: 2.5, speedMod: 1.4 },
+  giantScorpion: { name: "Giant Scorpion", level: 5, color: "#a04020", shape: "bug", hpMod: 1.4 },
 };
 
 function statsFor(lv) {
@@ -124,6 +127,39 @@ const QUESTS = {
 function pos(x, y, w, h) { return { x: x * WORLD_SCALE, y: y * WORLD_SCALE, w: w * WORLD_SCALE, h: h * WORLD_SCALE }; }
 function sp(x, y) { return { x: x * WORLD_SCALE, y: y * WORLD_SCALE }; }
 
+// Deterministic PRNG for apartment placement (per city)
+function lcg(seed) {
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+function cityApartments(seedName, count, srcW, srcH) {
+  const seed = Array.from(seedName).reduce((a,c)=>a*31 + c.charCodeAt(0), 7);
+  const r = lcg(seed);
+  const out = [];
+  const colors = ["#6a5a4a","#7a6a5a","#5a5054","#85756a","#4a4248","#9a7a6a","#605860","#8c7a68","#3a4048","#74646a"];
+  for (let i = 0; i < count; i++) {
+    let bx, by, bw, bh, tries = 0;
+    do {
+      bw = 80 + Math.floor(r() * 120);
+      bh = 80 + Math.floor(r() * 120);
+      bx = 20 + Math.floor(r() * (srcW - bw - 40));
+      by = 20 + Math.floor(r() * (srcH - bh - 40));
+      tries++;
+    } while (tries < 12);
+    out.push({
+      id: `apt${seedName}${i}`,
+      name: `Apt ${i+1}`,
+      ...pos(bx, by, bw, bh),
+      color: colors[i % colors.length],
+      interior: "hotel",
+      // apartments are non-interactive: no door is opened (action.type "none" handled like a wall)
+      apartment: true,
+      action: { type: "none" },
+    });
+  }
+  return out;
+}
+
 const MAPS = {
   main: {
     label: "The World", tileStyle: "overworld",
@@ -138,78 +174,127 @@ const MAPS = {
     ],
   },
   "camp-hb": {
-    label: "Camp Half-Blood", parent: "main", tileStyle: "grass",
-    spawn: sp(480, 540),
+    label: "Camp Half-Blood", tileStyle: "grass",
+    spawn: sp(510, 660),
+    mapW: 1000, mapH: 760,
     subzones: [
-      ...Array.from({ length: 12 }, (_, i) => {
-        const row = Math.floor(i / 6), col = i % 6;
-        const cabinNames = ["Zeus","Hera","Poseidon","Demeter","Ares","Athena","Apollo","Artemis","Hephaestus","Aphrodite","Hermes","Dionysus"];
+      // U-shape cabins: opening to the north
+      // Left column (1-4) top to bottom, Bottom row (5-8) left to right, Right column (9-12) bottom to top
+      ...(() => {
+        const cabinNames  = ["Zeus","Hera","Poseidon","Demeter","Ares","Athena","Apollo","Artemis","Hephaestus","Aphrodite","Hermes","Dionysus"];
         const cabinColors = ["#fff7a8","#dfd0ff","#9bd0f0","#d8ef9b","#f09898","#e8e0b8","#fff0a0","#d0e8ff","#d4a070","#ffc8d8","#d0d0d0","#b88dd0"];
-        return {
+        const slots = [
+          [ 80, 120],[ 80, 220],[ 80, 320],[ 80, 420],         // left column 1-4
+          [220, 520],[340, 520],[460, 520],[580, 520],         // bottom row 5-8
+          [710, 420],[710, 320],[710, 220],[710, 120],         // right column 9-12 (bottom up)
+        ];
+        return slots.map((s, i) => ({
           id: `cabin${i+1}`, name: `Cabin ${i+1}: ${cabinNames[i]}`,
-          ...pos(40 + col * 150, 30 + row * 110, 110, 70),
+          ...pos(s[0], s[1], 110, 70),
           color: cabinColors[i], interior: "cabin",
           action: { type: "cabin", weapon: `c${i+1}`, label: cabinNames[i] },
-        };
-      }),
-      { id:"arena",    name:"Arena",         ...pos(360, 380, 200, 130), color:"#c98a4a", interior:"arena",    action:{ type:"arena" } },
-      { id:"bighouse", name:"Big House",     ...pos( 60, 380, 200, 130), color:"#854a2a", interior:"bighouse", action:{ type:"bighouse" } },
-      { id:"myrmekes", name:"Myrmekes Lair", ...pos(680, 380, 200, 130), color:"#2a2a2a", interior:"lair",     action:{ type:"fight", mons:["myrmeke","myrmeke","myrmeke"] } },
+        }));
+      })(),
+      // Buildings inside the U
+      { id:"arena",    name:"Arena",          ...pos(380, 220, 200, 130), color:"#c98a4a", interior:"arena",    action:{ type:"arena" } },
+      { id:"bighouse", name:"Big House",      ...pos(380, 380, 200, 100), color:"#854a2a", interior:"bighouse", action:{ type:"bighouse" } },
+      // Forest entrance — outdoor zone, transitions to myrmekes-forest map
+      { id:"forest-entry", name:"Myrmekes Forest →", outdoor:true, ...pos(820, 600, 160, 140), color:"#2a4a20", action:{ type:"goto", to:"myrmekes-forest" } },
     ],
+    adjacency: { E: "long-island", S: "manhattan" },
+  },
+
+  // ============ MYRMEKES FOREST ============
+  "myrmekes-forest": {
+    label: "Myrmekes Forest", parent: "camp-hb", tileStyle: "grass",
+    spawn: sp(500, 720),
+    mapW: 1000, mapH: 800,
+    forest: true,
+    wanderers: [
+      { mid: "myrmeke", count: 5 },
+      { mid: "pitScorpion", count: 4 },
+      { mid: "tinyScorpion", count: 6 },
+      { mid: "giantScorpion", count: 2 },
+    ],
+    subzones: [
+      // Cave in the middle — the Myrmeke spawn point (just a building you can enter)
+      { id:"myrmeke-cave", name:"Myrmeke Cave",
+        ...pos(420, 360, 180, 140), color:"#2a1a14", interior:"cave",
+        action:{ type:"fight", mons:["myrmeke","myrmeke","myrmeke","myrmeke","giantScorpion"], msg:"You routed the swarm." } },
+    ],
+    adjacency: { S: "camp-hb" },
   },
   "long-island": {
-    label: "Long Island Sound", parent: "main", tileStyle: "water",
-    spawn: sp(480, 540),
+    label: "Long Island Sound", tileStyle: "water",
+    spawn: sp(480, 600),
+    mapW: 1000, mapH: 700,
     subzones: [
       { id:"som-portal", name:"Sea of Monsters →", ...pos( 80, 70, 280, 180), color:"#5aa8d8", interior:"portal", action:{ type:"goto", to:"sea-of-monsters" } },
       { id:"poseidon",   name:"Poseidon's Palace", ...pos(600, 70, 280, 180), color:"#7ac8f0", interior:"palace", action:{ type:"fight", mons:["shark","shark"], unlock:"tyson", reqInfo:"Defeat the sharks to unlock Tyson." } },
     ],
+    adjacency: { W: "camp-hb", E: "camp-j", S: "vegas" },
   },
   "camp-j": {
-    label: "Camp Jupiter", parent: "main", tileStyle: "sand",
-    spawn: sp(480, 540),
+    label: "Camp Jupiter", tileStyle: "sand",
+    spawn: sp(480, 660),
+    mapW: 1000, mapH: 760,
     subzones: [
       { id:"temple-j",   name:"Temple of Jupiter", ...pos( 60,  60, 220, 140), color:"#e8c068", interior:"temple",   action:{ type:"dialog", id:"octavian" } },
       { id:"temple-m",   name:"Temple of Mars",    ...pos(360,  60, 240, 140), color:"#c84040", interior:"temple",   action:{ type:"shop",   id:"mars" } },
       { id:"field-mars", name:"Field of Mars",     ...pos(680,  60, 220, 140), color:"#8a4030", interior:"fortress", action:{ type:"fight",  mons:["legion","legion","legion","legion"], unlock:"hazel", reqInfo:"Invade the fortress to unlock Hazel." } },
       { id:"mess",       name:"Mess Hall",         ...pos(360, 380, 240, 140), color:"#d4b878", interior:"mess",     action:{ type:"heal",   amount:"full", msg:"You eat your fill. Fully healed." } },
     ],
+    adjacency: { W: "long-island", S: "la" },
   },
   manhattan: {
-    label: "Manhattan", parent: "main", tileStyle: "city",
-    spawn: sp(480, 540),
+    label: "Manhattan", tileStyle: "city",
+    spawn: sp(900, 1340),
+    mapW: 1800, mapH: 1400,
+    city: true,
     subzones: [
-      { id:"central-park", name:"Central Park",       ...pos( 30,  30, 200, 120), color:"#7ea860", interior:"portal",  action:{ type:"goto",  to:"underworld", achievement:"ghostKing", msg:"You found the hidden entrance to the Underworld." } },
-      { id:"met",          name:"The MET",            ...pos( 30, 170, 200, 120), color:"#a09078", interior:"museum",  action:{ type:"fight", mons:["mrsDodds"], unlock:"selina", reqInfo:"Defeat Mrs. Dodds to unlock Selina." } },
-      { id:"plaza",        name:"The Plaza",          ...pos(260,  30, 200, 120), color:"#c8a060", interior:"hotel",   action:{ type:"fight", mons:["empousa"], grant:"automatons", reqInfo:"Defeat the Empousa to summon the automatons." } },
-      { id:"grand-central",name:"Grand Central",      ...pos(260, 170, 200, 120), color:"#9c8a60", interior:"station", action:{ type:"fight", mons:["hyperion"], allyIfFlag:"automatons", reqInfo:"Defeat Hyperion. Defeated Empousa? Hermes statue helps." } },
-      { id:"wmbridge",     name:"Williamsburg Br.",   ...pos(490,  30, 200, 120), color:"#6a6a78", interior:"bridge",  action:{ type:"fight", mons:["hellhound","hellhound","hellhound","hellhound","hellhound"], packBonus:true, unlock:"mrsOleary", reqInfo:"Win to befriend Mrs. O'Leary." } },
-      { id:"meriwether",   name:"Meriwether Prep",    ...pos(490, 170, 200, 120), color:"#a89868", interior:"school",  action:{ type:"fight", mons:["laistry","laistry","laistry"], unlock:"rachel", reqInfo:"Defeat the Giants to unlock Rachel." } },
-      { id:"library",      name:"NY Public Library",  ...pos(720,  30, 210, 120), color:"#b89870", interior:"library", action:{ type:"fight", mons:["dracaena","dracaena","dracaena"], packBonus:true, allyIfFlag:"automatons", unlock:"beckendorf", reqInfo:"Lion statue helps if you have automatons. Unlocks Beckendorf." } },
-      { id:"esb",          name:"Empire State Bldg",  ...pos(720, 170, 210, 120), color:"#7080a0", interior:"portal",  action:{ type:"goto",  to:"olympus", achievement:"ascension" } },
+      // Random positions throughout a larger city. The blocks no longer line up — easy to get lost.
+      { id:"central-park", name:"Central Park",       ...pos( 60,  80, 320, 200), color:"#7ea860", interior:"portal",  action:{ type:"goto",  to:"underworld", achievement:"ghostKing", msg:"You found the hidden entrance to the Underworld." } },
+      { id:"met",          name:"The MET",            ...pos(640, 120, 220, 140), color:"#a09078", interior:"museum",  action:{ type:"fight", mons:["mrsDodds"], unlock:"selina", reqInfo:"Defeat Mrs. Dodds to unlock Selina." } },
+      { id:"plaza",        name:"The Plaza",          ...pos(280, 460, 240, 160), color:"#c8a060", interior:"hotel",   action:{ type:"fight", mons:["empousa"], grant:"automatons", reqInfo:"Defeat the Empousa to summon the automatons." } },
+      { id:"grand-central",name:"Grand Central",      ...pos(900, 580, 280, 180), color:"#9c8a60", interior:"station", action:{ type:"fight", mons:["hyperion"], allyIfFlag:"automatons", reqInfo:"Defeat Hyperion. Defeated Empousa? Hermes statue helps." } },
+      { id:"wmbridge",     name:"Williamsburg Br.",   ...pos(1320, 980, 380, 140), color:"#6a6a78", interior:"bridge",  action:{ type:"fight", mons:["hellhound","hellhound","hellhound","hellhound","hellhound"], packBonus:true, unlock:"mrsOleary", reqInfo:"Win to befriend Mrs. O'Leary." } },
+      { id:"meriwether",   name:"Meriwether Prep",    ...pos(620, 800, 220, 140), color:"#a89868", interior:"school",  action:{ type:"fight", mons:["laistry","laistry","laistry"], unlock:"rachel", reqInfo:"Defeat the Giants to unlock Rachel." } },
+      { id:"library",      name:"NY Public Library",  ...pos(1180, 220, 260, 160), color:"#b89870", interior:"library", action:{ type:"fight", mons:["dracaena","dracaena","dracaena"], packBonus:true, allyIfFlag:"automatons", unlock:"beckendorf", reqInfo:"Lion statue helps if you have automatons. Unlocks Beckendorf." } },
+      { id:"esb",          name:"Empire State Bldg",  ...pos(1500, 340, 200, 220), color:"#7080a0", interior:"portal",  action:{ type:"goto",  to:"olympus", achievement:"ascension" } },
+      // Apartment buildings — decorative, no door, just obstacles to make the city harder to navigate
+      ...cityApartments("manhattan", 22, 1800, 1400),
     ],
+    adjacency: { N: "camp-hb", E: "vegas" },
   },
   vegas: {
-    label: "Las Vegas", parent: "main", tileStyle: "sand",
-    spawn: sp(480, 540),
+    label: "Las Vegas", tileStyle: "sand",
+    spawn: sp(900, 1240),
+    mapW: 1800, mapH: 1300,
+    city: true,
     subzones: [
-      { id:"arch",   name:"Gateway Arch", ...pos( 60, 60, 240, 240), color:"#b8b8b8", interior:"arch",  action:{ type:"fight", mons:["chimera","echidna"], unlock:"frank", reqInfo:"Defeat Chimera & Echidna to unlock Frank." } },
-      { id:"garden", name:"Auntie Em's",  ...pos(360, 60, 240, 240), color:"#7aa84a", interior:"garden", action:{ type:"fight", mons:["medusa"], unlock:"grover", reqInfo:"Defeat Medusa to unlock Grover." } },
-      { id:"lotus",  name:"Lotus Hotel",  ...pos(660, 60, 240, 240), color:"#e0a8d8", interior:"hotel",  action:{ type:"fight", mons:Array(10).fill("lotus"), unlock:"piper", reqInfo:"Win against 10 lotus eaters to unlock Piper." } },
+      { id:"arch",   name:"Gateway Arch", ...pos(180, 120, 240, 280), color:"#b8b8b8", interior:"arch",  action:{ type:"fight", mons:["chimera","echidna"], unlock:"frank", reqInfo:"Defeat Chimera & Echidna to unlock Frank." } },
+      { id:"garden", name:"Auntie Em's",  ...pos(820, 480, 260, 260), color:"#7aa84a", interior:"garden", action:{ type:"fight", mons:["medusa"], unlock:"grover", reqInfo:"Defeat Medusa to unlock Grover." } },
+      { id:"lotus",  name:"Lotus Hotel",  ...pos(1380, 220, 320, 320), color:"#e0a8d8", interior:"hotel",  action:{ type:"fight", mons:Array(10).fill("lotus"), unlock:"piper", reqInfo:"Win against 10 lotus eaters to unlock Piper." } },
+      ...cityApartments("vegas", 18, 1800, 1300),
     ],
+    adjacency: { N: "long-island", W: "manhattan", E: "la" },
   },
   la: {
-    label: "L.A.", parent: "main", tileStyle: "pavement",
-    spawn: sp(480, 540),
+    label: "L.A.", tileStyle: "pavement",
+    spawn: sp(900, 1240),
+    mapW: 1800, mapH: 1300,
+    city: true,
     subzones: [
-      { id:"mt-tam",    name:"Mount Tam",                ...pos( 30, 60, 220, 240), color:"#8c8c8c", interior:"mountain", action:{ type:"fight", mons:["atlas"],     unlock:"annabeth", quest:"artemis", reqInfo:"Defeat Atlas to free Artemis and unlock Annabeth." } },
-      { id:"mt-diablo", name:"Mount Diablo",             ...pos(280, 60, 220, 240), color:"#a04030", interior:"mountain", action:{ type:"fight", mons:["enceladus"], unlock:"leo", reqInfo:"Defeat Enceladus to unlock Leo." } },
-      { id:"crusty",    name:"Crusty's Waterbed Palace", ...pos(530, 60, 200, 240), color:"#aaa",    interior:"shop",     action:{ type:"fight", mons:["procrustes"], unlock:"bianca", reqInfo:"Defeat Procrustes to unlock Bianca." } },
-      { id:"doa",       name:"D.O.A. Studio",            ...pos(760, 60, 170, 240), color:"#1a1a1a", interior:"portal",   action:{ type:"goto",  to:"underworld",   achievement:"ghostKing" } },
+      { id:"mt-tam",    name:"Mount Tam",                ...pos( 60, 120, 260, 320), color:"#8c8c8c", interior:"mountain", action:{ type:"fight", mons:["atlas"],     unlock:"annabeth", quest:"artemis", reqInfo:"Defeat Atlas to free Artemis and unlock Annabeth." } },
+      { id:"mt-diablo", name:"Mount Diablo",             ...pos(560, 180, 260, 320), color:"#a04030", interior:"mountain", action:{ type:"fight", mons:["enceladus"], unlock:"leo", reqInfo:"Defeat Enceladus to unlock Leo." } },
+      { id:"crusty",    name:"Crusty's Waterbed Palace", ...pos(1140, 580, 240, 240), color:"#aaa",    interior:"shop",     action:{ type:"fight", mons:["procrustes"], unlock:"bianca", reqInfo:"Defeat Procrustes to unlock Bianca." } },
+      { id:"doa",       name:"D.O.A. Studio",            ...pos(1480, 220, 200, 280), color:"#1a1a1a", interior:"portal",   action:{ type:"goto",  to:"underworld",   achievement:"ghostKing" } },
+      ...cityApartments("la", 18, 1800, 1300),
     ],
+    adjacency: { N: "camp-j", W: "vegas" },
   },
   underworld: {
-    label: "The Underworld", parent: "main", tileStyle: "shadow",
+    label: "The Underworld", tileStyle: "shadow",
     spawn: sp(480, 540),
     subzones: [
       { id:"tartarus-portal", name:"Entrance to Tartarus", ...pos( 40,  60, 230, 180), color:"#1a0a1a", interior:"portal", action:{ type:"goto", to:"tartarus" } },
@@ -239,7 +324,7 @@ const MAPS = {
     ],
   },
   olympus: {
-    label: "Olympus (600th Floor)", parent: "main", tileStyle: "cloud",
+    label: "Olympus (600th Floor)", tileStyle: "cloud",
     spawn: sp(480, 540),
     subzones: [
       { id:"throne-hall", name:"Throne Hall",       ...pos(280,  80, 400, 240), color:"#fffae0", interior:"throne", action:{ type:"dialog", id:"olympus" } },
@@ -257,17 +342,18 @@ const MAPS = {
   },
 };
 
-// World bounds derived from map (1920x1200 by default)
+// World bounds derived from map (1920x1200 by default; mapW/mapH override)
 function mapBounds(map) {
   if (map._bounds) return map._bounds;
+  if (map.mapW && map.mapH) { map._bounds = { w: map.mapW * WORLD_SCALE, h: map.mapH * WORLD_SCALE }; return map._bounds; }
   let mx = 0, my = 0;
   for (const z of map.subzones) { mx = Math.max(mx, z.x + z.w); my = Math.max(my, z.y + z.h); }
-  // pad
   map._bounds = { w: Math.max(mx + 100, 1920), h: Math.max(my + 100, 1200) };
   return map._bounds;
 }
 
 // ===== STATE =====
+const DAY_LENGTH = 240;   // seconds for a full day/night cycle
 const G = {
   canvas: null, ctx: null,
   hud: null, overlay: null, overlayPanel: null, toastStack: null,
@@ -276,13 +362,14 @@ const G = {
   mode: "play",            // play | menu (and combat is in-world)
   mapId: "camp-hb",
   player: null,
-  interior: null,          // { zone, w, h, walls, door, sprites }
-  encounter: null,         // { mons[], onWin, onLose, label }
-  sprites: [],             // active sprites in current scene (interior or outdoor)
+  interior: null,
+  encounter: null,
+  sprites: [],
   exitCooldown: 0,
-  swing: null,             // { t, weapon, hit:false }
+  swing: null,
   hitFlash: 0,
   victoryFlash: 0,
+  timeOfDay: 0.3,          // 0..1; 0.25 = sunrise, 0.5 = noon, 0.75 = sunset, 0 = midnight
 };
 
 function defaultPlayer() {
@@ -702,7 +789,9 @@ function spawnEncounterEnemies() {
     let lv = base.level;
     if (G.encounter.packBonus && (mid === "hellhound" || mid === "dracaena")) lv = Math.min(8, lv + 1);
     const s = statsFor(lv);
-    // Spawn 80-220 units away in random direction in front
+    const hp = s.hp * (base.hpMod || 1);
+    const dmg = s.dmg * (base.dmgMod || 1);
+    const speed = s.speed * (base.speedMod || 1);
     const ang = G.player.angle + (Math.random() - 0.5) * Math.PI * 0.8;
     const dist = 100 + (i % 4) * 30 + Math.random() * 60;
     G.sprites.push({
@@ -710,7 +799,7 @@ function spawnEncounterEnemies() {
       x: G.player.x + Math.cos(ang) * dist,
       y: G.player.y + Math.sin(ang) * dist,
       size: 28, height: 50,
-      hp: s.hp, maxHp: s.hp, dmg: s.dmg, speed: s.speed, level: lv,
+      hp, maxHp: hp, dmg, speed, level: lv,
       attackCd: 0, stunT: 0,
     });
   });
@@ -743,9 +832,105 @@ function enterMap(id) {
   G.player.angle = -Math.PI / 2;
   G.interior = null; G.encounter = null;
   G.sprites = getSceneryFor(m).slice();
+  spawnWanderers(m);
+  spawnAmbient(m);
   G.mode = "play";
   G.exitCooldown = 0.6;
   save();
+}
+
+function transitionEdge(toMapId, fromDir) {
+  if (!MAPS[toMapId]) return;
+  G.mapId = toMapId;
+  const m = MAPS[toMapId];
+  const b = mapBounds(m);
+  // Spawn at opposite edge
+  if (fromDir === "E") { G.player.x = 20; G.player.y = b.h / 2; G.player.angle = 0; }
+  else if (fromDir === "W") { G.player.x = b.w - 20; G.player.y = b.h / 2; G.player.angle = Math.PI; }
+  else if (fromDir === "S") { G.player.x = b.w / 2; G.player.y = 20; G.player.angle = Math.PI / 2; }
+  else if (fromDir === "N") { G.player.x = b.w / 2; G.player.y = b.h - 20; G.player.angle = -Math.PI / 2; }
+  G.interior = null; G.encounter = null;
+  G.sprites = getSceneryFor(m).slice();
+  spawnWanderers(m);
+  spawnAmbient(m);
+  G.mode = "play";
+  G.exitCooldown = 0.8;
+  toast(`Entered ${m.label}`, "info");
+  save();
+}
+
+function spawnWanderers(m) {
+  if (!m.wanderers) return;
+  const b = mapBounds(m);
+  for (const w of m.wanderers) {
+    const base = MONSTERS[w.mid]; if (!base) continue;
+    for (let i = 0; i < w.count; i++) {
+      const lv = base.level;
+      const s = statsFor(lv);
+      const hp = s.hp * (base.hpMod || 1);
+      const dmg = s.dmg * (base.dmgMod || 1);
+      const speed = s.speed * (base.speedMod || 1) * 0.7;     // wandering is slower than combat
+      let sx, sy, tries = 0;
+      do {
+        sx = 40 + Math.random() * (b.w - 80);
+        sy = 40 + Math.random() * (b.h - 80);
+        tries++;
+        if (tries > 8) break;
+      } while (insideSubzone(m, sx, sy) || Math.hypot(sx - m.spawn.x, sy - m.spawn.y) < 120);
+      G.sprites.push({
+        kind: "wanderer",
+        mid: w.mid, name: base.name, shape: base.shape, color: base.color,
+        x: sx, y: sy,
+        size: 16 + lv * 2, height: 28 + lv * 5,
+        hp, maxHp: hp, dmg, speed, level: lv,
+        wanderAngle: Math.random() * Math.PI * 2,
+        wanderT: 1 + Math.random() * 3,
+      });
+    }
+  }
+}
+function insideSubzone(m, x, y) {
+  for (const z of m.subzones) if (x > z.x && x < z.x + z.w && y > z.y && y < z.y + z.h) return true;
+  return false;
+}
+
+function spawnAmbient(m) {
+  if (G.interior) return;
+  const presets = ambientPresetFor(m);
+  if (!presets) return;
+  const b = mapBounds(m);
+  for (let i = 0; i < presets.count; i++) {
+    let sx, sy, tries = 0;
+    do {
+      sx = 40 + Math.random() * (b.w - 80);
+      sy = 40 + Math.random() * (b.h - 80);
+      tries++;
+      if (tries > 8) break;
+    } while (insideSubzone(m, sx, sy));
+    const color = presets.colors[Math.floor(Math.random() * presets.colors.length)];
+    G.sprites.push({
+      kind: "ambient",
+      name: presets.name, shape: presets.shape, color,
+      x: sx, y: sy,
+      size: presets.size, height: presets.height,
+      wanderAngle: Math.random() * Math.PI * 2,
+      wanderT: 1 + Math.random() * 3,
+      speed: presets.speed,
+    });
+  }
+}
+function ambientPresetFor(m) {
+  const id = G.mapId;
+  if (id === "camp-hb") return { count: 10, name: "Demigod", shape:"humanoid", size: 14, height: 38, speed: 35,
+                                  colors: ["#c0d860","#80a0e0","#e0a060","#d080a0","#90c0a0","#c8a040"] };
+  if (id === "myrmekes-forest") return null;
+  if (m.city) return { count: 14, name: "Mortal", shape:"humanoid", size: 12, height: 36, speed: 40,
+                       colors: ["#3a5a8a","#8a4a3a","#5a3a3a","#3a3a3a","#6a4a3a","#4a4a5a","#2a2a3a","#7a7a7a"] };
+  if (m.tileStyle === "water") return { count: 16, name: "Fish", shape:"fish", size: 10, height: 14, speed: 45,
+                                        colors: ["#ffae40","#5060a0","#a04030","#d4d4d4","#80c060"] };
+  if (id === "underworld" || id === "hades-palace" || id === "tartarus") return { count: 6, name: "Wandering Soul", shape:"ghost", size: 14, height: 36, speed: 25, colors: ["#9090a0","#808090","#a0a0b0"] };
+  if (id === "camp-j") return { count: 8, name: "Legionnaire", shape:"humanoid", size: 14, height: 38, speed: 35, colors: ["#a04030","#8a3a28"] };
+  return null;
 }
 
 // ===== SCENERY =====
@@ -909,10 +1094,22 @@ const PATTERN_BY_KIND = {
 };
 function patternFor(kind) { return PATTERN_BY_KIND[kind] || "stone"; }
 
-function buildingDoor(z) { return { x: z.x + z.w/2 - DOOR_W/2, y: z.y + z.h - WALL_T, w: DOOR_W, h: WALL_T + 8 }; }
+function buildingDoor(z) {
+  if (z.apartment) return null;
+  return { x: z.x + z.w/2 - DOOR_W/2, y: z.y + z.h - WALL_T, w: DOOR_W, h: WALL_T + 8 };
+}
 function buildingWalls(z) {
+  const pat = z.apartment ? "brick" : patternFor(z.interior);
+  if (z.apartment) {
+    // Sealed apartment — no door
+    return [
+      { x: z.x, y: z.y, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
+      { x: z.x, y: z.y + z.h - WALL_T, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
+      { x: z.x, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true, pattern: pat },
+      { x: z.x + z.w - WALL_T, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true, pattern: pat },
+    ];
+  }
   const d = buildingDoor(z);
-  const pat = patternFor(z.interior);
   return [
     { x: z.x, y: z.y, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
     { x: z.x, y: z.y + z.h - WALL_T, w: d.x - z.x, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
@@ -929,12 +1126,13 @@ function getOutdoorWalls() {
     if (z.outdoor) continue;
     for (const w of buildingWalls(z)) walls.push(w);
   }
-  // Add map bounds as walls
+  // Add bounding walls — but only on edges without an adjacency, so the player can walk into a neighbor map.
   const b = mapBounds(m);
-  walls.push({ x: -10, y: -10, w: b.w + 20, h: 10, color:"#000", vertical:false });
-  walls.push({ x: -10, y: b.h, w: b.w + 20, h: 10, color:"#000", vertical:false });
-  walls.push({ x: -10, y: -10, w: 10, h: b.h + 20, color:"#000", vertical:true });
-  walls.push({ x: b.w, y: -10, w: 10, h: b.h + 20, color:"#000", vertical:true });
+  const adj = m.adjacency || {};
+  if (!adj.N) walls.push({ x: -10, y: -10, w: b.w + 20, h: 10, color:"#202020", vertical:false });
+  if (!adj.S) walls.push({ x: -10, y: b.h, w: b.w + 20, h: 10, color:"#202020", vertical:false });
+  if (!adj.W) walls.push({ x: -10, y: -10, w: 10, h: b.h + 20, color:"#202020", vertical:true });
+  if (!adj.E) walls.push({ x: b.w, y: -10, w: 10, h: b.h + 20, color:"#202020", vertical:true });
   m._wallCache = walls;
   return walls;
 }
@@ -986,6 +1184,8 @@ function setupInput() {
 
 // ===== UPDATE =====
 function update(dt) {
+  // Advance time-of-day regardless of mode
+  G.timeOfDay = (G.timeOfDay + dt / DAY_LENGTH) % 1;
   if (G.mode !== "play") return;
   const p = G.player;
   if (p.specialCooldown > 0) p.specialCooldown = Math.max(0, p.specialCooldown - dt);
@@ -1018,6 +1218,14 @@ function update(dt) {
   // Outdoor zone overlap → goto map
   const m = MAPS[G.mapId];
   if (!G.interior) {
+    // Edge transitions (walk off the map edge to a neighbor region)
+    if (G.exitCooldown <= 0 && m.adjacency) {
+      const b = mapBounds(m);
+      if (p.x < 4 && m.adjacency.W) { transitionEdge(m.adjacency.W, "W"); return; }
+      if (p.x > b.w - 4 && m.adjacency.E) { transitionEdge(m.adjacency.E, "E"); return; }
+      if (p.y < 4 && m.adjacency.N) { transitionEdge(m.adjacency.N, "N"); return; }
+      if (p.y > b.h - 4 && m.adjacency.S) { transitionEdge(m.adjacency.S, "S"); return; }
+    }
     for (const z of m.subzones) {
       if (!z.outdoor) continue;
       if (p.x > z.x && p.x < z.x + z.w && p.y > z.y && p.y < z.y + z.h && G.exitCooldown <= 0) {
@@ -1026,9 +1234,10 @@ function update(dt) {
     }
     // Door step → enter interior
     for (const z of m.subzones) {
-      if (z.outdoor) continue;
+      if (z.outdoor || z.apartment) continue;
       if (G.exitCooldown > 0) continue;
       const d = buildingDoor(z);
+      if (!d) continue;
       if (p.x > d.x && p.x < d.x + d.w && p.y > d.y - 6 && p.y < d.y + d.h + 6) {
         enterInterior(z); return;
       }
@@ -1123,6 +1332,37 @@ function updateSprites(dt) {
           p.frozenT = 3.0; toast("Thanatos freezes you for 3 seconds.", "bad");
         }
       }
+    } else if (s.kind === "wanderer") {
+      // Wander around — change direction periodically
+      s.wanderT -= dt;
+      if (s.wanderT <= 0) { s.wanderAngle = Math.random() * Math.PI * 2; s.wanderT = 1.5 + Math.random() * 3; }
+      const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+      const dx = Math.cos(s.wanderAngle) * s.speed * dt;
+      const dy = Math.sin(s.wanderAngle) * s.speed * dt;
+      const nx = s.x + dx, ny = s.y + dy;
+      if (!collidesCircle(walls, nx, s.y, s.size/2)) s.x = nx; else s.wanderT = 0;
+      if (!collidesCircle(walls, s.x, ny, s.size/2)) s.y = ny; else s.wanderT = 0;
+      // Player contact → instant combat (only if not already in combat)
+      if (!G.encounter) {
+        const pdx = p.x - s.x, pdy = p.y - s.y;
+        const contactR = s.size + PLAYER_R + 6;
+        if (pdx*pdx + pdy*pdy < contactR * contactR) {
+          const sourceMid = s.mid;
+          const idx = G.sprites.indexOf(s);
+          if (idx >= 0) G.sprites.splice(idx, 1);
+          toast(`${s.name} attacks!`, "bad");
+          startCombat({ mons: [sourceMid], label: s.name + " ambush" });
+          break;
+        }
+      }
+    } else if (s.kind === "ambient") {
+      s.wanderT -= dt;
+      if (s.wanderT <= 0) { s.wanderAngle = Math.random() * Math.PI * 2; s.wanderT = 2 + Math.random() * 4; }
+      const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
+      const dx = Math.cos(s.wanderAngle) * s.speed * dt;
+      const dy = Math.sin(s.wanderAngle) * s.speed * dt;
+      if (!collidesCircle(walls, s.x + dx, s.y, s.size/2)) s.x += dx; else s.wanderT = 0;
+      if (!collidesCircle(walls, s.x, s.y + dy, s.size/2)) s.y += dy; else s.wanderT = 0;
     } else if (s.kind === "ally") {
       // find nearest enemy, attack
       let near = null, nd = Infinity;
@@ -1286,43 +1526,111 @@ function interiorStyle(kind) {
   return map[kind] || "stone";
 }
 
+// Helpers for day/night
+function dayMix(a, b, t) { return a + (b - a) * t; }
+function dayColor(t, palette) {
+  // palette: { mid:[top,bot], dawn:[top,bot], night:[top,bot], dusk:[top,bot] }
+  // t in [0,1]: 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset
+  let from, to, frac;
+  if (t < 0.25) { from = palette.night; to = palette.dawn; frac = t / 0.25; }
+  else if (t < 0.5) { from = palette.dawn; to = palette.day; frac = (t - 0.25) / 0.25; }
+  else if (t < 0.75) { from = palette.day; to = palette.dusk; frac = (t - 0.5) / 0.25; }
+  else { from = palette.dusk; to = palette.night; frac = (t - 0.75) / 0.25; }
+  return [mixHex(from[0], to[0], frac), mixHex(from[1], to[1], frac)];
+}
+function mixHex(a, b, f) {
+  const A = parseColor(a), B = parseColor(b);
+  const r = Math.round(A.r + (B.r - A.r) * f);
+  const g = Math.round(A.g + (B.g - A.g) * f);
+  const bl = Math.round(A.b + (B.b - A.b) * f);
+  return `rgb(${r},${g},${bl})`;
+}
+function isDarkTime() { return G.timeOfDay < 0.22 || G.timeOfDay > 0.78; }
+function brightnessForTime() {
+  const t = G.timeOfDay;
+  if (t < 0.2) return 0.45;
+  if (t < 0.3) return dayMix(0.45, 1.0, (t - 0.2) / 0.1);
+  if (t < 0.7) return 1.0;
+  if (t < 0.8) return dayMix(1.0, 0.55, (t - 0.7) / 0.1);
+  return 0.45;
+}
+
+const SKY_DAYCYCLE = {
+  // Each style gets dawn/day/dusk/night color pairs
+  grass:    { dawn:["#f0a070","#d06070"], day:["#7ec0ff","#3a7ed0"], dusk:["#f0a070","#9a4070"], night:["#10183a","#040818"] },
+  overworld:{ dawn:["#f0a070","#d06070"], day:["#7ec0ff","#4a8ed0"], dusk:["#f0a070","#9a4070"], night:["#10183a","#040818"] },
+  sand:     { dawn:["#ffd0a0","#d8806a"], day:["#ffe0a0","#d49050"], dusk:["#ff8050","#9a3020"], night:["#180a18","#08020a"] },
+  water:    { dawn:["#f0b0a0","#a06880"], day:["#6ab0ff","#1e508a"], dusk:["#ff8050","#503060"], night:["#0a1838","#020818"] },
+  city:     { dawn:["#c8a0a0","#806a8a"], day:["#5a6a8a","#2a3050"], dusk:["#c0805a","#502838"], night:["#08081a","#020208"] },
+  pavement: { dawn:["#c8a0a0","#806a8a"], day:["#7080a0","#3a4258"], dusk:["#c0805a","#502838"], night:["#08081a","#020208"] },
+  cave:     { dawn:["#1a0e18","#080308"], day:["#1a0e18","#080308"], dusk:["#1a0e18","#080308"], night:["#1a0e18","#080308"] },
+  shadow:   { dawn:["#3a0a1a","#0a0005"], day:["#3a0a1a","#0a0005"], dusk:["#3a0a1a","#0a0005"], night:["#3a0a1a","#0a0005"] },
+  cloud:    { dawn:["#ffd4f0","#c0a0d8"], day:["#ffffff","#c0d4ff"], dusk:["#ffc0a0","#8060a0"], night:["#1a1838","#080820"] },
+  stone:    { dawn:["#705870","#3a3258"], day:["#5a6070","#2a3040"], dusk:["#705870","#3a3258"], night:["#10101a","#020208"] },
+  wood:     { dawn:["#f0a070","#d06070"], day:["#7ec0ff","#3a7ed0"], dusk:["#f0a070","#9a4070"], night:["#10183a","#040818"] },
+  marble:   { dawn:["#ffd4f0","#d0a0d8"], day:["#ffffff","#c0d4ff"], dusk:["#ffc0a0","#8060a0"], night:["#1a1838","#080820"] },
+  arena:    { dawn:["#ffd0a0","#d8806a"], day:["#ffe0a0","#a05828"], dusk:["#ff8050","#702018"], night:["#180a18","#08020a"] },
+};
+
 function drawSky(style, horizonY) {
   const ctx = G.ctx;
-  const palette = {
-    grass: ["#7ec0ff","#3a7ed0"], sand: ["#ffe0a0","#d49050"], water: ["#6ab0ff","#1e508a"],
-    city: ["#5a6a8a","#2a3050"], pavement: ["#7080a0","#3a4258"], cave: ["#1a0e18","#080308"],
-    shadow: ["#3a0a1a","#0a0005"], cloud: ["#ffffff","#c0d4ff"], stone: ["#5a6070","#2a3040"],
-    wood: ["#7ec0ff","#3a7ed0"], marble: ["#ffffff","#c0d4ff"], arena: ["#ffe0a0","#a05828"],
-    overworld: ["#7ec0ff","#4a8ed0"],
-  };
-  const [t, b] = palette[style] || palette.grass;
+  const isUnderground = style === "cave" || style === "shadow";
+  const t = isUnderground ? 0.5 : G.timeOfDay;
+  const palette = SKY_DAYCYCLE[style] || SKY_DAYCYCLE.grass;
+  const [topC, botC] = isUnderground ? [palette.day[0], palette.day[1]] : dayColor(t, palette);
   const grad = ctx.createLinearGradient(0, 0, 0, horizonY);
-  grad.addColorStop(0, t); grad.addColorStop(1, b);
+  grad.addColorStop(0, topC); grad.addColorStop(1, botC);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, horizonY);
-  // Stars in dark biomes
-  if (style === "cave" || style === "shadow") {
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
-    for (let i = 0; i < 50; i++) {
-      const sx = (i * 137) % W, sy = (i * 79) % horizonY;
-      ctx.fillRect(sx, sy, 1, 1);
+
+  // Sun / Moon based on time of day
+  if (!isUnderground) {
+    // Sun arc: noon (t=0.5) is at top. sunrise (t=0.25) at left horizon. sunset (t=0.75) at right horizon.
+    if (t >= 0.22 && t <= 0.78) {
+      const sunU = (t - 0.22) / (0.78 - 0.22);
+      const sunX = sunU * W;
+      const sunY = horizonY * (1 - Math.sin(sunU * Math.PI) * 0.78);
+      const sunSize = 26 + Math.sin(sunU * Math.PI) * 6;
+      // Glow
+      const g2 = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, 100);
+      g2.addColorStop(0, "rgba(255,240,160,0.6)");
+      g2.addColorStop(1, "rgba(255,240,160,0)");
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, W, horizonY);
+      // Sun
+      ctx.fillStyle = "rgba(255,245,180,1)";
+      ctx.beginPath(); ctx.arc(sunX, sunY, sunSize, 0, Math.PI*2); ctx.fill();
     }
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    // Moon (during night)
+    if (t < 0.25 || t > 0.75) {
+      const moonT = t < 0.5 ? (t + 0.25) % 1 : (t - 0.75 + 0.25);
+      const moonU = moonT;
+      const moonX = (1 - moonU) * W;
+      const moonY = horizonY * (1 - Math.sin(moonU * Math.PI) * 0.6) * 0.7 + 20;
+      ctx.fillStyle = "rgba(240,240,255,0.95)";
+      ctx.beginPath(); ctx.arc(moonX, moonY, 22, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = botC;
+      ctx.beginPath(); ctx.arc(moonX - 6, moonY - 2, 18, 0, Math.PI*2); ctx.fill();
+    }
+    // Stars at night
+    if (t < 0.22 || t > 0.78) {
+      const starAlpha = t < 0.22 ? (0.22 - t) / 0.22 : (t - 0.78) / 0.22;
+      ctx.fillStyle = `rgba(255,255,255,${0.6 * starAlpha})`;
+      for (let i = 0; i < 80; i++) {
+        const sx = (i * 137) % W, sy = (i * 79) % (horizonY * 0.8);
+        ctx.fillRect(sx, sy, 1 + (i % 3 === 0 ? 1 : 0), 1);
+      }
+    }
+  } else {
+    // Underground torch glow + sparse star-like flecks
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
     ctx.beginPath(); ctx.arc(W * 0.78, horizonY * 0.3, 22, 0, Math.PI*2); ctx.fill();
-  } else if (style !== "stone" && style !== "wood") {
-    // Sun
-    ctx.fillStyle = "rgba(255,240,160,0.9)";
-    ctx.beginPath(); ctx.arc(W * 0.18, horizonY * 0.3, 26, 0, Math.PI*2); ctx.fill();
-    // Sun glow
-    const g2 = ctx.createRadialGradient(W * 0.18, horizonY * 0.3, 10, W * 0.18, horizonY * 0.3, 80);
-    g2.addColorStop(0, "rgba(255,240,160,0.4)");
-    g2.addColorStop(1, "rgba(255,240,160,0)");
-    ctx.fillStyle = g2;
-    ctx.fillRect(0, 0, W, horizonY);
   }
+
   // Mountains silhouette in outdoor scenes
   if (style === "grass" || style === "overworld" || style === "sand") {
-    ctx.fillStyle = "rgba(40,60,80,0.5)";
+    const mountainShade = isDarkTime() ? "rgba(15,20,40,0.7)" : "rgba(40,60,80,0.5)";
+    ctx.fillStyle = mountainShade;
     ctx.beginPath();
     ctx.moveTo(0, horizonY);
     for (let i = 0; i <= 8; i++) {
@@ -1334,9 +1642,10 @@ function drawSky(style, horizonY) {
     ctx.closePath();
     ctx.fill();
   }
-  // Clouds
+  // Clouds — fade out at night
   if (style === "grass" || style === "overworld" || style === "cloud" || style === "marble") {
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    const cloudAlpha = isDarkTime() ? 0.25 : 0.7;
+    ctx.fillStyle = `rgba(255,255,255,${cloudAlpha})`;
     for (let i = 0; i < 7; i++) {
       const cx = (i * 220 + (performance.now()/100)) % (W + 200) - 100;
       const cy = 30 + (i % 3) * 28;
@@ -1385,6 +1694,7 @@ function drawFloor(style, horizonY) {
   const colors = pal.colors;
   const ncolors = colors.length;
   const sp = pal.speckle && pal.speckle[0];
+  const bright = (style === "cave" || style === "shadow") ? 1 : brightnessForTime();
   // Pre-compute fog color from style sky bottom
   for (let y = 0; y < halfH; y++) {
     const screenY = y + horizonY;
@@ -1394,9 +1704,9 @@ function drawFloor(style, horizonY) {
     if (rowDist > 1100) {
       // fill row with far-fog color
       for (let x = 0, ix = y * W * 4; x < W; x++, ix += 4) {
-        data[ix] = colors[0][0] * 0.3 | 0;
-        data[ix+1] = colors[0][1] * 0.3 | 0;
-        data[ix+2] = colors[0][2] * 0.3 | 0;
+        data[ix] = colors[0][0] * 0.3 * bright | 0;
+        data[ix+1] = colors[0][1] * 0.3 * bright | 0;
+        data[ix+2] = colors[0][2] * 0.3 * bright | 0;
         data[ix+3] = 255;
       }
       continue;
@@ -1421,9 +1731,9 @@ function drawFloor(style, horizonY) {
         g = g * (1 - alpha) + sp[1] * alpha;
         b = b * (1 - alpha) + sp[2] * alpha;
       }
-      data[ix]   = r * fog | 0;
-      data[ix+1] = g * fog | 0;
-      data[ix+2] = b * fog | 0;
+      data[ix]   = r * fog * bright | 0;
+      data[ix+1] = g * fog * bright | 0;
+      data[ix+2] = b * fog * bright | 0;
       data[ix+3] = 255;
       wx += stepX;
       wy += stepY;
@@ -1436,6 +1746,9 @@ function renderWalls(walls, horizonY) {
   const ctx = G.ctx;
   const depth = new Array(NUM_RAYS).fill(Infinity);
   const p = G.player;
+  const m = MAPS[G.mapId];
+  const style = G.interior ? interiorStyle(G.interior.kind) : m.tileStyle;
+  const bright = (style === "cave" || style === "shadow") ? 1 : brightnessForTime();
   for (let i = 0; i < NUM_RAYS; i++) {
     const sx = i * RAY_STEP;
     const screenT = sx / W;
@@ -1447,7 +1760,7 @@ function renderWalls(walls, horizonY) {
     depth[i] = perp;
     const lineH = Math.min(H * 4, (WALL_TALL * PROJ) / perp);
     const top = horizonY - lineH / 2;
-    let shade = Math.max(0.25, Math.min(1, 1 - perp / 900));
+    let shade = Math.max(0.25, Math.min(1, 1 - perp / 900)) * bright;
     if (hit.vertical) shade *= 0.85;
     const baseColor = shadeColor(hit.color, shade);
     ctx.fillStyle = baseColor;
@@ -1581,9 +1894,10 @@ function drawSprite(ctx, s, sx, sy, sw, sh, perp) {
   ctx.ellipse(sx + sw/2, sy + sh, sw * 0.45, sw * 0.12, 0, 0, Math.PI*2);
   ctx.fill();
   const k = s.kind;
-  if (k === "enemy" || k === "enemyPreview") drawCreature(ctx, s, sx, sy, sw, sh);
+  if (k === "enemy" || k === "enemyPreview" || k === "wanderer") drawCreature(ctx, s, sx, sy, sw, sh);
   else if (k === "ally") drawAlly(ctx, s, sx, sy, sw, sh);
   else if (k === "npc") drawHumanoid(ctx, s.color || "#7a4a2a", sx, sy, sw, sh);
+  else if (k === "ambient") drawAmbient(ctx, s, sx, sy, sw, sh);
   else if (k === "pedestal") drawPedestal(ctx, s, sx, sy, sw, sh);
   else if (k === "portal") drawPortal(ctx, s, sx, sy, sw, sh);
   else if (k === "fountain") drawFountain(ctx, sx, sy, sw, sh);
@@ -1731,6 +2045,27 @@ function drawAlly(ctx, s, x, y, w, h) {
   // Green outline
   ctx.strokeStyle = "#5cd97e"; ctx.lineWidth = 2;
   ctx.strokeRect(x + w*0.2, y + h*0.25, w*0.6, h*0.7);
+}
+function drawAmbient(ctx, s, x, y, w, h) {
+  if (s.shape === "fish") drawFish(ctx, s.color, x, y, w, h);
+  else if (s.shape === "ghost") drawGhost(ctx, s.color, x, y, w, h);
+  else drawHumanoid(ctx, s.color, x, y, w, h);
+}
+function drawFish(ctx, color, x, y, w, h) {
+  // Side-view fish body
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(x + w/2, y + h*0.6, w*0.4, h*0.35, 0, 0, Math.PI*2);
+  ctx.fill();
+  // Tail
+  ctx.beginPath();
+  ctx.moveTo(x + w*0.1, y + h*0.6);
+  ctx.lineTo(x - w*0.05, y + h*0.3);
+  ctx.lineTo(x - w*0.05, y + h*0.9);
+  ctx.closePath(); ctx.fill();
+  // Eye
+  ctx.fillStyle = "#000";
+  ctx.beginPath(); ctx.arc(x + w*0.72, y + h*0.55, w*0.05, 0, Math.PI*2); ctx.fill();
 }
 function drawPedestal(ctx, s, x, y, w, h) {
   // Glow
