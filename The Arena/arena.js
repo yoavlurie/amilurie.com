@@ -979,7 +979,7 @@ function setupInput() {
       if (G.mode === "menu") { closeOverlay(); return; }
       openInventory(); return;
     }
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD","KeyQ","KeyE"].includes(e.code)) e.preventDefault();
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD","KeyQ","KeyE","KeyF"].includes(e.code)) e.preventDefault();
   });
   window.addEventListener("keyup", e => { G.keys[e.code] = false; });
 }
@@ -1070,19 +1070,26 @@ function update(dt) {
 function updateSprites(dt) {
   const p = G.player;
   const remove = [];
+  // Track nearest interactable for "[F] Grab" prompt
+  G._nearestInteract = null;
+  let nearestD2 = Infinity;
+  const FORCED_INTERACT = G.pressedThisFrame.KeyF;
   for (let i = 0; i < G.sprites.length; i++) {
     const s = G.sprites[i];
-    // Interior interactables: walk-into trigger
+    // Interactables: walk-into trigger OR press F when nearby
     if (s.onStep && !s._triggered) {
       const dx = s.x - p.x, dy = s.y - p.y;
       const d2 = dx*dx + dy*dy;
-      const trigR = (s.size || 24) + PLAYER_R;
+      const trigR = (s.size || 24) + PLAYER_R + 24;   // generous auto-trigger
+      const promptR = (s.size || 24) + PLAYER_R + 90; // wider for F-prompt + F-press
       if (d2 < trigR * trigR) {
         s._triggered = true;
         s.onStep();
-        G.exitCooldown = 0.7;
-        // Many onStep handlers replace G.sprites or G.interior — be defensive
+        G.exitCooldown = 0.8;
         break;
+      }
+      if (d2 < promptR * promptR && d2 < nearestD2) {
+        nearestD2 = d2; G._nearestInteract = s;
       }
     }
     // Enemy AI
@@ -1135,6 +1142,12 @@ function updateSprites(dt) {
     }
   }
   for (let i = remove.length - 1; i >= 0; i--) G.sprites.splice(remove[i], 1);
+  // F to interact with nearest sprite even at long range
+  if (FORCED_INTERACT && G._nearestInteract && !G._nearestInteract._triggered) {
+    G._nearestInteract._triggered = true;
+    G._nearestInteract.onStep();
+    G.exitCooldown = 0.8;
+  }
   // Encounter resolution
   if (G.encounter) {
     const enemiesAlive = G.sprites.some(s => s.kind === "enemy" && s.deadT === undefined);
@@ -2018,6 +2031,30 @@ function drawCrosshair() {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(W/2 - 8, H/2); ctx.lineTo(W/2 + 8, H/2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W/2, H/2 - 8); ctx.lineTo(W/2, H/2 + 8); ctx.stroke();
+  // Interact prompt
+  if (G._nearestInteract && !G._nearestInteract._triggered) {
+    const s = G._nearestInteract;
+    let verb = "Interact";
+    if (s.kind === "pedestal") verb = "Grab " + (s.label || "item");
+    else if (s.kind === "npc") verb = "Talk to " + (s.label || "them");
+    else if (s.kind === "portal") verb = "Enter " + (s.label || "portal");
+    else if (s.kind === "fountain") verb = s.label || "Rest";
+    else if (s.kind === "ring") verb = "Step in";
+    else if (s.kind === "enemyPreview") verb = "Fight!";
+    // Background pill
+    ctx.font = "bold 14px -apple-system, sans-serif";
+    const text = `[F] ${verb}`;
+    const tw = ctx.measureText(text).width + 24;
+    const tx = W/2 - tw/2;
+    const ty = H/2 + 30;
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.fillRect(tx, ty, tw, 28);
+    ctx.strokeStyle = "rgba(255,210,80,0.85)"; ctx.lineWidth = 1.5;
+    ctx.strokeRect(tx, ty, tw, 28);
+    ctx.fillStyle = "#ffd060";
+    ctx.textAlign = "center";
+    ctx.fillText(text, W/2, ty + 19);
+  }
 }
 
 function drawCompass() {
