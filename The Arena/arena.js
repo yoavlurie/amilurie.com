@@ -865,19 +865,47 @@ function enterMap(id) {
   save();
 }
 
-// If the player is stuck inside a wall (e.g. random apartment overlap on a city
-// spawn), spiral outward looking for a clear spot.
+// If the player is stuck inside a wall, find them a clear spot. Tries:
+// (1) spiral outward from current position, (2) map.spawn, (3) brute scan
+// the whole map, (4) far corner.
 function ensurePlayerClear() {
   const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
   if (!collidesCircle(walls, G.player.x, G.player.y, PLAYER_R)) return;
-  for (let r = 24; r < 800; r += 24) {
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
+  // 1) spiral
+  for (let r = 24; r < 1500; r += 24) {
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
       const nx = G.player.x + Math.cos(a) * r;
       const ny = G.player.y + Math.sin(a) * r;
       if (!collidesCircle(walls, nx, ny, PLAYER_R)) { G.player.x = nx; G.player.y = ny; return; }
     }
   }
+  // 2) map spawn
+  const m = G.interior ? null : MAPS[G.mapId];
+  if (m && m.spawn && !collidesCircle(walls, m.spawn.x, m.spawn.y, PLAYER_R)) {
+    G.player.x = m.spawn.x; G.player.y = m.spawn.y; return;
+  }
+  // 3) brute scan in 80-unit steps
+  const b = G.interior ? { w: I_W, h: I_H } : mapBounds(MAPS[G.mapId]);
+  for (let y = 40; y < b.h - 40; y += 80) {
+    for (let x = 40; x < b.w - 40; x += 80) {
+      if (!collidesCircle(walls, x, y, PLAYER_R)) { G.player.x = x; G.player.y = y; return; }
+    }
+  }
+  // 4) give up gracefully — just place at (40, 40)
+  G.player.x = 40; G.player.y = 40;
+}
+
+function respawnAtMapSpawn() {
+  const m = MAPS[G.mapId];
+  if (!m || !m.spawn) return;
+  G.player.x = m.spawn.x;
+  G.player.y = m.spawn.y;
+  G.player.angle = -Math.PI / 2;
+  G.player.frozenT = 0;
+  ensurePlayerClear();
+  G.exitCooldown = 0.5;
+  toast("Respawned at spawn point.", "info");
 }
 
 function transitionEdge(toMapId, fromDir) {
@@ -1219,7 +1247,13 @@ function setupInput() {
       if (G.mode === "menu") { closeOverlay(); return; }
       openInventory(); return;
     }
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD","KeyQ","KeyE","KeyF"].includes(e.code)) e.preventDefault();
+    if (e.code === "KeyR") {
+      e.preventDefault();
+      if (G.mode === "menu") return;
+      respawnAtMapSpawn();
+      return;
+    }
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter","KeyW","KeyA","KeyS","KeyD","KeyQ","KeyE","KeyF","KeyR"].includes(e.code)) e.preventDefault();
   });
   window.addEventListener("keyup", e => { G.keys[e.code] = false; });
 }
@@ -2481,8 +2515,10 @@ function init() {
   } else toast("Save loaded.", "info");
   if (!MAPS[G.mapId]) G.mapId = "camp-hb";
   if (typeof G.player.angle !== "number") G.player.angle = -Math.PI / 2;
+  // Clean stale runtime state that shouldn't persist between sessions
+  G.player.frozenT = 0;
+  G.player.specialCooldown = 0;
   // Populate sprites for the current map (so we have scenery + ambient on load).
-  // Don't reset position here — the player's saved position is what they expect.
   const m = MAPS[G.mapId];
   G.sprites = getSceneryFor(m).slice();
   spawnWanderers(m);
