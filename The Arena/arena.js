@@ -725,8 +725,8 @@ function endCombat(won) {
     enterMap("camp-hb"); return;
   }
   G.encounter = null;
-  // remove enemies and ally sprites
-  G.sprites = G.sprites.filter(s => s.kind !== "enemy" && s.kind !== "ally");
+  // remove enemies, allies, and the interior monster previews
+  G.sprites = G.sprites.filter(s => s.kind !== "enemy" && s.kind !== "ally" && s.kind !== "enemyPreview");
   save();
 }
 function makeAllySprite(x, y) {
@@ -742,10 +742,79 @@ function enterMap(id) {
   G.player.x = m.spawn.x; G.player.y = m.spawn.y;
   G.player.angle = -Math.PI / 2;
   G.interior = null; G.encounter = null;
-  G.sprites = [];
+  G.sprites = getSceneryFor(m).slice();
   G.mode = "play";
   G.exitCooldown = 0.6;
   save();
+}
+
+// ===== SCENERY =====
+const SCENERY_KIND = {
+  grass:    ["tree","tree","tree","rock"],
+  overworld:["tree","sign","sign","rock"],
+  sand:     ["cactus","rock","rock"],
+  water:    ["rock","seaweed","seaweed"],
+  city:     ["lamp","mailbox","lamp","trash"],
+  pavement: ["lamp","palm","palm","trash"],
+  cave:     ["stalag","stalag","rock"],
+  shadow:   ["tomb","tomb","bone","tomb"],
+  cloud:    ["pillar","pillar","pillar"],
+  stone:    ["rock","rock","pillar"],
+};
+function getSceneryFor(m) {
+  if (m._scenery) return m._scenery;
+  const b = mapBounds(m);
+  const out = [];
+  // Landmark sprites for outdoor zone transitions (so player can SEE where to go)
+  for (const z of m.subzones) {
+    if (!z.outdoor) continue;
+    const cx = z.x + z.w/2, cy = z.y + z.h/2;
+    out.push({ kind:"landmark", x: cx, y: cy, size: 30, height: 120, color: z.color, label: z.name });
+    // ring of small markers around it
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      out.push({ kind:"marker", x: cx + Math.cos(a) * (z.w/2 - 10), y: cy + Math.sin(a) * (z.h/2 - 10),
+                 size: 8, height: 24, color: z.color });
+    }
+  }
+  // Decorative scenery scattered, avoiding subzones
+  const kinds = SCENERY_KIND[m.tileStyle] || SCENERY_KIND.grass;
+  const density = m.tileStyle === "overworld" ? 60 : 50;
+  for (let i = 0; i < density; i++) {
+    const sx = Math.random() * (b.w - 80) + 40;
+    const sy = Math.random() * (b.h - 80) + 40;
+    // skip if inside any subzone or near spawn
+    let blocked = false;
+    for (const z of m.subzones) {
+      if (sx > z.x - 30 && sx < z.x + z.w + 30 && sy > z.y - 30 && sy < z.y + z.h + 30) { blocked = true; break; }
+    }
+    const spawn = m.spawn;
+    if (Math.hypot(sx - spawn.x, sy - spawn.y) < 60) blocked = true;
+    if (blocked) continue;
+    const k = kinds[Math.floor(Math.random() * kinds.length)];
+    out.push(makeScenery(k, sx, sy));
+  }
+  m._scenery = out;
+  return out;
+}
+function makeScenery(kind, x, y) {
+  const presets = {
+    tree:    { size: 20, height: 90, color: "#2a5a20" },
+    sign:    { size: 12, height: 50, color: "#8a5a30" },
+    rock:    { size: 16, height: 24, color: "#7a7a86" },
+    cactus:  { size: 12, height: 60, color: "#3a8050" },
+    seaweed: { size: 10, height: 40, color: "#3a6080" },
+    lamp:    { size: 6,  height: 90, color: "#3a3a44" },
+    mailbox: { size: 10, height: 36, color: "#2848a0" },
+    palm:    { size: 16, height: 100, color: "#3a7848" },
+    trash:   { size: 10, height: 30, color: "#3a3a3a" },
+    stalag:  { size: 14, height: 70, color: "#2a1a24" },
+    tomb:    { size: 14, height: 50, color: "#5a5a64" },
+    bone:    { size: 12, height: 16, color: "#e8e0c8" },
+    pillar:  { size: 14, height: 110, color: "#e8e0d0" },
+  };
+  const p = presets[kind] || presets.rock;
+  return { kind: "scenery", scenery: kind, x, y, size: p.size, height: p.height, color: p.color };
 }
 
 // Interior dimensions (world units)
@@ -755,12 +824,16 @@ function buildInterior(zone) {
   const T = 8;
   const doorW = 60;
   const doorX = I_W/2 - doorW/2;
+  const pat = patternFor(zone.interior);
+  // Wall color matches the building's exterior so the interior feels themed
+  const wallColor = shadeColor(zone.color || "#7a5a3a", 0.85);
+  const wallColorDark = shadeColor(zone.color || "#7a5a3a", 0.6);
   const walls = [
-    { x: 0, y: 0, w: I_W, h: T, color:"#3a2a1a" },
-    { x: 0, y: I_H - T, w: doorX, h: T, color:"#3a2a1a" },
-    { x: doorX + doorW, y: I_H - T, w: I_W - doorX - doorW, h: T, color:"#3a2a1a" },
-    { x: 0, y: 0, w: T, h: I_H, color:"#3a2a1a" },
-    { x: I_W - T, y: 0, w: T, h: I_H, color:"#3a2a1a" },
+    { x: 0, y: 0, w: I_W, h: T, color: wallColorDark, pattern: pat },
+    { x: 0, y: I_H - T, w: doorX, h: T, color: wallColorDark, pattern: pat },
+    { x: doorX + doorW, y: I_H - T, w: I_W - doorX - doorW, h: T, color: wallColorDark, pattern: pat },
+    { x: 0, y: 0, w: T, h: I_H, color: wallColor, pattern: pat },
+    { x: I_W - T, y: 0, w: T, h: I_H, color: wallColor, pattern: pat },
   ];
   const door = { x: doorX, y: I_H - T - 4, w: doorW, h: T + 8 };
   const inter = { zone, w: I_W, h: I_H, walls, door, kind: zone.interior || "cabin" };
@@ -809,7 +882,8 @@ function enterInterior(zone) {
 function leaveInterior(showToast=true) {
   if (!G.interior) return;
   const z = G.interior.zone;
-  G.interior = null; G.sprites = []; G.encounter = null;
+  G.interior = null; G.encounter = null;
+  G.sprites = getSceneryFor(MAPS[G.mapId]).slice();
   // Stand player just outside the building door in the outdoor map
   const door = buildingDoor(z);
   G.player.x = door.x + door.w/2;
@@ -824,15 +898,27 @@ function leaveInterior(showToast=true) {
 // ===== WALLS / DOORS =====
 const WALL_T = 8;
 const DOOR_W = 44;
+const PATTERN_BY_KIND = {
+  cabin:"plank", bighouse:"plank", arena:"stone", lair:"stone",
+  portal:"metal", palace:"marble", temple:"marble", fortress:"stone",
+  mess:"plank", museum:"marble", hotel:"brick", station:"stone",
+  bridge:"metal", school:"brick", library:"brick", arch:"marble",
+  garden:"stone", mountain:"stone", shop:"plank", fields:"stone",
+  river:"stone", throne:"marble", forge:"metal", spa:"marble",
+  cave:"stone", cliff:"stone",
+};
+function patternFor(kind) { return PATTERN_BY_KIND[kind] || "stone"; }
+
 function buildingDoor(z) { return { x: z.x + z.w/2 - DOOR_W/2, y: z.y + z.h - WALL_T, w: DOOR_W, h: WALL_T + 8 }; }
 function buildingWalls(z) {
   const d = buildingDoor(z);
+  const pat = patternFor(z.interior);
   return [
-    { x: z.x, y: z.y, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
-    { x: z.x, y: z.y + z.h - WALL_T, w: d.x - z.x, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
-    { x: d.x + d.w, y: z.y + z.h - WALL_T, w: z.x + z.w - d.x - d.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false },
-    { x: z.x, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true },
-    { x: z.x + z.w - WALL_T, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true },
+    { x: z.x, y: z.y, w: z.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
+    { x: z.x, y: z.y + z.h - WALL_T, w: d.x - z.x, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
+    { x: d.x + d.w, y: z.y + z.h - WALL_T, w: z.x + z.w - d.x - d.w, h: WALL_T, color: shadeColor(z.color, 0.7), vertical:false, pattern: pat },
+    { x: z.x, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true, pattern: pat },
+    { x: z.x + z.w - WALL_T, y: z.y, w: WALL_T, h: z.h, color: z.color, vertical:true, pattern: pat },
   ];
 }
 function getOutdoorWalls() {
@@ -1139,7 +1225,8 @@ function castRay(walls, ox, oy, angle) {
       const t = raySegT(ox, oy, dx, dy, s[0], s[1], s[2], s[3]);
       if (t !== null && t > 0.01) {
         if (!nearest || t < nearest.dist) {
-          nearest = { dist: t, color: w.color, vertical: s[4] };
+          const hx = ox + dx * t, hy = oy + dy * t;
+          nearest = { dist: t, color: w.color, vertical: s[4], pattern: w.pattern, u: s[4] ? hy : hx };
         }
       }
     }
@@ -1153,11 +1240,12 @@ function render() {
   ctx.clearRect(0, 0, W, H);
   const m = MAPS[G.mapId];
   const style = G.interior ? interiorStyle(G.interior.kind) : m.tileStyle;
-  drawSky(style);
-  drawFloor(style);
+  const horizonY = H / 2;
+  drawSky(style, horizonY);
+  drawFloor(style, horizonY);
   const walls = G.interior ? getInteriorWalls() : getOutdoorWalls();
-  const depthBuf = renderWalls(walls);
-  renderSprites(depthBuf);
+  const depthBuf = renderWalls(walls, horizonY);
+  renderSprites(depthBuf, horizonY);
   drawWeaponOverlay();
   drawMinimap();
   drawCrosshair();
@@ -1185,7 +1273,7 @@ function interiorStyle(kind) {
   return map[kind] || "stone";
 }
 
-function drawSky(style) {
+function drawSky(style, horizonY) {
   const ctx = G.ctx;
   const palette = {
     grass: ["#7ec0ff","#3a7ed0"], sand: ["#ffe0a0","#d49050"], water: ["#6ab0ff","#1e508a"],
@@ -1195,51 +1283,143 @@ function drawSky(style) {
     overworld: ["#7ec0ff","#4a8ed0"],
   };
   const [t, b] = palette[style] || palette.grass;
-  const grad = ctx.createLinearGradient(0, 0, 0, H/2);
+  const grad = ctx.createLinearGradient(0, 0, 0, horizonY);
   grad.addColorStop(0, t); grad.addColorStop(1, b);
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H/2);
-  // Celestial body
+  ctx.fillRect(0, 0, W, horizonY);
+  // Stars in dark biomes
   if (style === "cave" || style === "shadow") {
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
-    ctx.beginPath(); ctx.arc(W * 0.78, H * 0.15, 22, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    for (let i = 0; i < 50; i++) {
+      const sx = (i * 137) % W, sy = (i * 79) % horizonY;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath(); ctx.arc(W * 0.78, horizonY * 0.3, 22, 0, Math.PI*2); ctx.fill();
   } else if (style !== "stone" && style !== "wood") {
-    ctx.fillStyle = "rgba(255,240,160,0.45)";
-    ctx.beginPath(); ctx.arc(W * 0.18, H * 0.16, 30, 0, Math.PI*2); ctx.fill();
+    // Sun
+    ctx.fillStyle = "rgba(255,240,160,0.9)";
+    ctx.beginPath(); ctx.arc(W * 0.18, horizonY * 0.3, 26, 0, Math.PI*2); ctx.fill();
+    // Sun glow
+    const g2 = ctx.createRadialGradient(W * 0.18, horizonY * 0.3, 10, W * 0.18, horizonY * 0.3, 80);
+    g2.addColorStop(0, "rgba(255,240,160,0.4)");
+    g2.addColorStop(1, "rgba(255,240,160,0)");
+    ctx.fillStyle = g2;
+    ctx.fillRect(0, 0, W, horizonY);
+  }
+  // Mountains silhouette in outdoor scenes
+  if (style === "grass" || style === "overworld" || style === "sand") {
+    ctx.fillStyle = "rgba(40,60,80,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY);
+    for (let i = 0; i <= 8; i++) {
+      const sx = (i / 8) * W;
+      const sy = horizonY - 30 - Math.sin(i * 1.3 + G.player.angle * 0.2) * 20 - (i % 3) * 10;
+      ctx.lineTo(sx, sy);
+    }
+    ctx.lineTo(W, horizonY);
+    ctx.closePath();
+    ctx.fill();
   }
   // Clouds
   if (style === "grass" || style === "overworld" || style === "cloud" || style === "marble") {
-    ctx.fillStyle = "rgba(255,255,255,0.5)";
-    for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    for (let i = 0; i < 7; i++) {
       const cx = (i * 220 + (performance.now()/100)) % (W + 200) - 100;
-      const cy = 40 + (i % 3) * 30;
+      const cy = 30 + (i % 3) * 28;
       ctx.beginPath(); ctx.ellipse(cx, cy, 60, 14, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx + 20, cy - 8, 35, 10, 0, 0, Math.PI*2); ctx.fill();
     }
   }
 }
 
-function drawFloor(style) {
+// Floor palettes used by floor casting. Each entry is [r,g,b] tuples; the floor
+// tile size in world units controls how chunky the texture looks.
+const FLOOR_PALETTES = {
+  grass:     { tile: 36, colors: [[58,96,32],[40,72,24],[80,108,40],[50,86,28],[36,68,20]], speckle:[[20,40,12,40]] },
+  sand:      { tile: 30, colors: [[180,138,72],[160,122,60],[200,158,90],[170,130,68]], speckle:[[120,90,40,30]] },
+  water:     { tile: 40, colors: [[42,88,120],[34,80,112],[58,108,140],[40,86,118]], speckle:[[200,230,255,20]] },
+  city:      { tile: 28, colors: [[58,58,68],[44,44,52],[68,68,78],[50,50,60]], speckle:[[0,0,0,80]] },
+  pavement:  { tile: 28, colors: [[80,80,90],[66,66,76],[92,92,102]], speckle:[[0,0,0,60]] },
+  cave:      { tile: 34, colors: [[37,24,32],[28,18,24],[48,32,40],[34,22,30]], speckle:[[80,40,40,30]] },
+  shadow:    { tile: 32, colors: [[26,8,16],[14,4,10],[34,12,20]], speckle:[[200,60,20,40]] },
+  cloud:     { tile: 32, colors: [[188,196,221],[160,170,200],[210,220,240]], speckle:[[255,255,255,80]] },
+  stone:     { tile: 38, colors: [[64,70,84],[48,54,68],[80,86,98],[58,62,76]], speckle:[[0,0,0,40]] },
+  wood:      { tile: 18, colors: [[122,74,32],[100,60,24],[140,90,42],[110,68,28]], speckle:[[60,30,12,40]] },
+  marble:    { tile: 36, colors: [[216,212,200],[196,192,180],[232,228,218]], speckle:[[120,120,110,30]] },
+  arena:     { tile: 30, colors: [[168,120,58],[148,104,46],[188,140,72]], speckle:[[80,40,16,50]] },
+  overworld: { tile: 36, colors: [[58,96,32],[40,72,24],[80,108,40],[50,86,28]], speckle:[[20,40,12,40]] },
+};
+
+let _floorImg = null;
+function drawFloor(style, horizonY) {
   const ctx = G.ctx;
-  const palette = {
-    grass: ["#3a6020","#1a3010"], sand: ["#b48a48","#7a5828"], water: ["#2a5878","#0a2840"],
-    city: ["#3a3a44","#1a1a22"], pavement: ["#50505a","#26262e"], cave: ["#251820","#100008"],
-    shadow: ["#1a0810","#050005"], cloud: ["#bcc4dd","#7a82a0"], stone: ["#404654","#1c2030"],
-    wood: ["#7a4a20","#3a200c"], marble: ["#d8d4c8","#6c6860"], arena: ["#a8783a","#4a2810"],
-    overworld: ["#3a6020","#1a3010"],
-  };
-  const [near, far] = palette[style] || palette.grass;
-  const grad = ctx.createLinearGradient(0, H/2, 0, H);
-  grad.addColorStop(0, far); grad.addColorStop(1, near);
-  ctx.fillStyle = grad; ctx.fillRect(0, H/2, W, H/2);
-  // Floor band texture lines
-  ctx.strokeStyle = "rgba(0,0,0,0.18)";
-  for (let i = 1; i < 12; i++) {
-    const y = H/2 + Math.pow(i / 12, 2) * (H/2);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  const halfH = H - horizonY;
+  if (halfH < 4) return;
+  if (!_floorImg || _floorImg.width !== W || _floorImg.height !== halfH) {
+    _floorImg = ctx.createImageData(W, halfH);
   }
+  const data = _floorImg.data;
+  const camHeight = 30;                                  // eye height (world units)
+  const angL = G.player.angle - HALF_FOV;
+  const angR = G.player.angle + HALF_FOV;
+  const dxL = Math.cos(angL), dyL = Math.sin(angL);
+  const dxR = Math.cos(angR), dyR = Math.sin(angR);
+  const px = G.player.x, py = G.player.y;
+  const pal = FLOOR_PALETTES[style] || FLOOR_PALETTES.grass;
+  const tile = pal.tile;
+  const inv_tile = 1 / tile;
+  const colors = pal.colors;
+  const ncolors = colors.length;
+  const sp = pal.speckle && pal.speckle[0];
+  // Pre-compute fog color from style sky bottom
+  for (let y = 0; y < halfH; y++) {
+    const screenY = y + horizonY;
+    const dRow = screenY - horizonY + 0.5;
+    if (dRow < 0.5) continue;
+    const rowDist = (camHeight * PROJ) / dRow;
+    if (rowDist > 1100) {
+      // fill row with far-fog color
+      for (let x = 0, ix = y * W * 4; x < W; x++, ix += 4) {
+        data[ix] = colors[0][0] * 0.3 | 0;
+        data[ix+1] = colors[0][1] * 0.3 | 0;
+        data[ix+2] = colors[0][2] * 0.3 | 0;
+        data[ix+3] = 255;
+      }
+      continue;
+    }
+    const wxL = px + dxL * rowDist;
+    const wyL = py + dyL * rowDist;
+    const wxR = px + dxR * rowDist;
+    const wyR = py + dyR * rowDist;
+    const stepX = (wxR - wxL) / W;
+    const stepY = (wyR - wyL) / W;
+    let wx = wxL, wy = wyL;
+    const fog = Math.max(0.25, Math.min(1, 1 - rowDist / 1000));
+    for (let x = 0, ix = y * W * 4; x < W; x++, ix += 4) {
+      const cx = Math.floor(wx * inv_tile);
+      const cy = Math.floor(wy * inv_tile);
+      const h = ((cx * 73856093) ^ (cy * 19349663)) >>> 0;
+      const c = colors[h % ncolors];
+      let r = c[0], g = c[1], b = c[2];
+      if (sp && (h % 41) === 0) {
+        const alpha = sp[3] / 255;
+        r = r * (1 - alpha) + sp[0] * alpha;
+        g = g * (1 - alpha) + sp[1] * alpha;
+        b = b * (1 - alpha) + sp[2] * alpha;
+      }
+      data[ix]   = r * fog | 0;
+      data[ix+1] = g * fog | 0;
+      data[ix+2] = b * fog | 0;
+      data[ix+3] = 255;
+      wx += stepX;
+      wy += stepY;
+    }
+  }
+  ctx.putImageData(_floorImg, 0, horizonY);
 }
 
-function renderWalls(walls) {
+function renderWalls(walls, horizonY) {
   const ctx = G.ctx;
   const depth = new Array(NUM_RAYS).fill(Infinity);
   const p = G.player;
@@ -1253,22 +1433,101 @@ function renderWalls(walls) {
     if (perp < 0.5) continue;
     depth[i] = perp;
     const lineH = Math.min(H * 4, (WALL_TALL * PROJ) / perp);
-    const top = (H - lineH) / 2;
+    const top = horizonY - lineH / 2;
     let shade = Math.max(0.25, Math.min(1, 1 - perp / 900));
     if (hit.vertical) shade *= 0.85;
-    ctx.fillStyle = shadeColor(hit.color, shade);
+    const baseColor = shadeColor(hit.color, shade);
+    ctx.fillStyle = baseColor;
     ctx.fillRect(sx, top, RAY_STEP, lineH);
-    // top highlight
+    drawWallTexture(ctx, sx, top, lineH, hit, perp, shade);
+    // top highlight (block edge)
     ctx.fillStyle = shadeColor(hit.color, Math.min(1, shade * 1.4));
     ctx.fillRect(sx, top, RAY_STEP, Math.max(2, lineH * 0.04));
     // bottom shade
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
     ctx.fillRect(sx, top + lineH - Math.max(2, lineH * 0.05), RAY_STEP, Math.max(2, lineH * 0.05));
   }
   return depth;
 }
 
-function renderSprites(depth) {
+function drawWallTexture(ctx, sx, top, lineH, hit, perp, shade) {
+  const pattern = hit.pattern;
+  if (!pattern) return;
+  const u = hit.u;
+  if (pattern === "brick") {
+    // 5 rows of bricks, each ~12 world-units tall
+    const rows = 5, brickW = 28;
+    const rowH = lineH / rows;
+    // Horizontal mortar lines
+    ctx.fillStyle = `rgba(0,0,0,${0.35 * shade + 0.15})`;
+    for (let r = 1; r < rows; r++) ctx.fillRect(sx, top + r * rowH - 1, RAY_STEP, 2);
+    // Vertical mortar — alternating brick offset per row
+    for (let r = 0; r < rows; r++) {
+      const offset = r % 2 === 0 ? 0 : brickW / 2;
+      const localU = ((u + offset) % brickW + brickW) % brickW;
+      if (localU < 2 || localU > brickW - 2) {
+        ctx.fillStyle = `rgba(0,0,0,${0.35 * shade + 0.15})`;
+        ctx.fillRect(sx, top + r * rowH, RAY_STEP, rowH);
+      }
+    }
+  } else if (pattern === "plank") {
+    // Vertical planks — seams every ~14 world units
+    const plankW = 14;
+    const localU = ((u % plankW) + plankW) % plankW;
+    if (localU < 1.2) {
+      ctx.fillStyle = `rgba(0,0,0,${0.5 * shade + 0.2})`;
+      ctx.fillRect(sx, top, RAY_STEP, lineH);
+    }
+    // Wood grain (subtle horizontal lines)
+    const grainY = (Math.sin(u * 0.4) * 0.5 + 0.5);
+    ctx.fillStyle = `rgba(0,0,0,${0.12 * shade})`;
+    ctx.fillRect(sx, top + lineH * (0.25 + grainY * 0.05), RAY_STEP, 1);
+    ctx.fillRect(sx, top + lineH * (0.6 + grainY * 0.05), RAY_STEP, 1);
+  } else if (pattern === "stone") {
+    // 3 rows of large stones
+    const rows = 3, blockW = 40;
+    const rowH = lineH / rows;
+    ctx.fillStyle = `rgba(0,0,0,${0.4 * shade + 0.2})`;
+    for (let r = 1; r < rows; r++) ctx.fillRect(sx, top + r * rowH - 1, RAY_STEP, 2);
+    for (let r = 0; r < rows; r++) {
+      const offset = r % 2 === 0 ? 0 : blockW / 2;
+      const localU = ((u + offset) % blockW + blockW) % blockW;
+      if (localU < 2.5 || localU > blockW - 2.5) {
+        ctx.fillStyle = `rgba(0,0,0,${0.4 * shade + 0.2})`;
+        ctx.fillRect(sx, top + r * rowH, RAY_STEP, rowH);
+      }
+      // Speckle for stone texture
+      const h = (Math.floor(u/3) * 73 + r * 131) & 31;
+      if (h < 6) {
+        ctx.fillStyle = `rgba(0,0,0,${0.18 * shade})`;
+        ctx.fillRect(sx, top + r * rowH + (h * 2 % rowH), RAY_STEP, 1);
+      }
+    }
+  } else if (pattern === "marble") {
+    // Veined marble — wavy semi-transparent streaks
+    ctx.fillStyle = `rgba(255,255,255,${0.15 * shade})`;
+    const v1 = (Math.sin(u * 0.2) * 0.5 + 0.5);
+    ctx.fillRect(sx, top + lineH * (0.2 + v1 * 0.1), RAY_STEP, 1);
+    const v2 = (Math.sin(u * 0.13 + 1) * 0.5 + 0.5);
+    ctx.fillRect(sx, top + lineH * (0.6 + v2 * 0.15), RAY_STEP, 1);
+    ctx.fillStyle = `rgba(0,0,0,${0.08})`;
+    ctx.fillRect(sx, top + lineH * (0.45 + v1 * 0.1), RAY_STEP, 1);
+  } else if (pattern === "metal") {
+    // Vertical highlight + rivets
+    ctx.fillStyle = `rgba(255,255,255,${0.18 * shade})`;
+    const localU = ((u % 24) + 24) % 24;
+    if (localU < 1) ctx.fillRect(sx, top, RAY_STEP, lineH);
+    // Rivets every 30 units
+    const rivetU = ((u % 30) + 30) % 30;
+    if (rivetU < 2) {
+      ctx.fillStyle = `rgba(255,255,255,${0.3 * shade})`;
+      ctx.fillRect(sx, top + lineH * 0.2, RAY_STEP, Math.max(2, lineH * 0.04));
+      ctx.fillRect(sx, top + lineH * 0.8, RAY_STEP, Math.max(2, lineH * 0.04));
+    }
+  }
+}
+
+function renderSprites(depth, horizonY) {
   const ctx = G.ctx;
   const p = G.player;
   const arr = G.sprites.map(s => {
@@ -1288,7 +1547,7 @@ function renderSprites(depth) {
     const screenH = (sizeH * PROJ) / perp;
     const screenW = (sizeW * PROJ) / perp;
     const screenX = W/2 + (Math.tan(o.ang) * PROJ);
-    const screenY = H/2 + screenH/8 - screenH;  // anchor near floor
+    const screenY = horizonY + screenH/8 - screenH;  // anchor near floor
     const left = screenX - screenW/2;
     // depth check by column
     const colStart = Math.max(0, Math.floor(left / RAY_STEP));
@@ -1316,6 +1575,9 @@ function drawSprite(ctx, s, sx, sy, sw, sh, perp) {
   else if (k === "portal") drawPortal(ctx, s, sx, sy, sw, sh);
   else if (k === "fountain") drawFountain(ctx, sx, sy, sw, sh);
   else if (k === "ring") drawArenaRing(ctx, sx, sy, sw, sh);
+  else if (k === "scenery") drawScenery(ctx, s, sx, sy, sw, sh);
+  else if (k === "landmark") drawLandmark(ctx, s, sx, sy, sw, sh);
+  else if (k === "marker") drawMarker(ctx, s, sx, sy, sw, sh);
   else {
     ctx.fillStyle = s.color || "#888";
     ctx.fillRect(sx, sy + sh*0.3, sw, sh*0.7);
@@ -1511,6 +1773,155 @@ function drawArenaRing(ctx, x, y, w, h) {
   ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.7, w*0.5, h*0.4, 0, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = "#e8a050"; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.ellipse(x + w/2, y + h*0.7, w*0.5, h*0.4, 0, 0, Math.PI*2); ctx.stroke();
+}
+
+function drawScenery(ctx, s, x, y, w, h) {
+  const k = s.scenery;
+  if (k === "tree" || k === "palm") {
+    // Trunk
+    ctx.fillStyle = "#5a3818";
+    ctx.fillRect(x + w*0.42, y + h*0.55, w*0.16, h*0.45);
+    // Foliage (multiple circles for puffy look)
+    ctx.fillStyle = s.color;
+    const cx = x + w/2;
+    const top = y + h*0.1;
+    ctx.beginPath(); ctx.arc(cx, top + h*0.18, w*0.45, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - w*0.25, top + h*0.3, w*0.32, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + w*0.25, top + h*0.3, w*0.32, 0, Math.PI*2); ctx.fill();
+    // Shading on right
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.arc(cx + w*0.25, top + h*0.3, w*0.20, -Math.PI/2, Math.PI/2); ctx.fill();
+  } else if (k === "rock") {
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.1, y + h);
+    ctx.lineTo(x + w*0.2, y + h*0.3);
+    ctx.lineTo(x + w*0.5, y + h*0.1);
+    ctx.lineTo(x + w*0.85, y + h*0.4);
+    ctx.lineTo(x + w*0.95, y + h);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.5, y + h*0.1);
+    ctx.lineTo(x + w*0.85, y + h*0.4);
+    ctx.lineTo(x + w*0.95, y + h);
+    ctx.lineTo(x + w*0.5, y + h);
+    ctx.closePath(); ctx.fill();
+    // highlight
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(x + w*0.3, y + h*0.25, w*0.2, 3);
+  } else if (k === "cactus") {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.4, y + h*0.2, w*0.2, h*0.8);
+    ctx.fillRect(x + w*0.2, y + h*0.4, w*0.15, h*0.3);
+    ctx.fillRect(x + w*0.65, y + h*0.3, w*0.15, h*0.3);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(x + w*0.55, y + h*0.2, w*0.05, h*0.8);
+  } else if (k === "lamp") {
+    // Post
+    ctx.fillStyle = "#2a2a30";
+    ctx.fillRect(x + w*0.4, y + h*0.2, w*0.2, h*0.8);
+    // Lamp head
+    ctx.fillStyle = "#1a1a20";
+    ctx.fillRect(x + w*0.2, y + h*0.1, w*0.6, h*0.18);
+    // Glow
+    ctx.fillStyle = "rgba(255,220,120,0.6)";
+    ctx.beginPath(); ctx.arc(x + w/2, y + h*0.2, w*0.4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#ffe080";
+    ctx.fillRect(x + w*0.35, y + h*0.13, w*0.3, h*0.12);
+  } else if (k === "mailbox") {
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + w*0.45, y + h*0.5, w*0.1, h*0.5);
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.2, y + h*0.2, w*0.6, h*0.35);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.fillRect(x + w*0.55, y + h*0.3, w*0.1, h*0.05);
+  } else if (k === "trash") {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.25, y + h*0.2, w*0.5, h*0.8);
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(x + w*0.25, y + h*0.2, w*0.5, h*0.05);
+    ctx.fillRect(x + w*0.25, y + h*0.5, w*0.5, 1);
+  } else if (k === "tomb") {
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.2, y + h);
+    ctx.lineTo(x + w*0.2, y + h*0.3);
+    ctx.arc(x + w/2, y + h*0.3, w*0.3, Math.PI, 0);
+    ctx.lineTo(x + w*0.8, y + h);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.fillRect(x + w*0.4, y + h*0.45, w*0.2, h*0.04);
+    ctx.fillRect(x + w*0.35, y + h*0.55, w*0.3, h*0.04);
+  } else if (k === "bone") {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.2, y + h*0.4, w*0.6, h*0.2);
+    ctx.beginPath(); ctx.arc(x + w*0.2, y + h*0.5, w*0.15, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w*0.8, y + h*0.5, w*0.15, 0, Math.PI*2); ctx.fill();
+  } else if (k === "pillar") {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.3, y + h*0.1, w*0.4, h*0.9);
+    // Capital
+    ctx.fillRect(x + w*0.2, y + h*0.05, w*0.6, h*0.1);
+    // Base
+    ctx.fillRect(x + w*0.2, y + h*0.95, w*0.6, h*0.05);
+    // Flutes
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    for (let i = 0; i < 4; i++) ctx.fillRect(x + w*0.32 + i * w*0.1, y + h*0.15, 1, h*0.8);
+  } else if (k === "stalag") {
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.moveTo(x + w*0.2, y + h);
+    ctx.lineTo(x + w/2, y + h*0.1);
+    ctx.lineTo(x + w*0.8, y + h);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.beginPath();
+    ctx.moveTo(x + w/2, y + h*0.1);
+    ctx.lineTo(x + w*0.4, y + h*0.6);
+    ctx.lineTo(x + w*0.6, y + h*0.6);
+    ctx.closePath(); ctx.fill();
+  } else if (k === "seaweed") {
+    ctx.strokeStyle = s.color; ctx.lineWidth = w*0.2;
+    ctx.beginPath();
+    ctx.moveTo(x + w/2, y + h);
+    ctx.quadraticCurveTo(x + w*0.2, y + h*0.5, x + w/2, y + h*0.2);
+    ctx.stroke();
+  } else if (k === "sign") {
+    // Post
+    ctx.fillStyle = "#5a3818";
+    ctx.fillRect(x + w*0.45, y + h*0.5, w*0.1, h*0.5);
+    // Board
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.1, y + h*0.2, w*0.8, h*0.3);
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.fillRect(x + w*0.15, y + h*0.32, w*0.4, h*0.04);
+    ctx.fillRect(x + w*0.15, y + h*0.4, w*0.6, h*0.04);
+  } else {
+    ctx.fillStyle = s.color;
+    ctx.fillRect(x + w*0.25, y + h*0.3, w*0.5, h*0.7);
+  }
+}
+
+function drawLandmark(ctx, s, x, y, w, h) {
+  // Tall colored pillar with banner — visible from afar
+  ctx.fillStyle = "#3a2818";
+  ctx.fillRect(x + w*0.4, y + h*0.4, w*0.2, h*0.6);
+  // Banner
+  ctx.fillStyle = s.color;
+  ctx.fillRect(x + w*0.1, y, w*0.8, h*0.4);
+  ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 2;
+  ctx.strokeRect(x + w*0.1, y, w*0.8, h*0.4);
+  // Glow above
+  const t = performance.now() / 600;
+  ctx.fillStyle = `rgba(255,220,120,${0.3 + 0.2 * Math.sin(t)})`;
+  ctx.beginPath(); ctx.arc(x + w/2, y - h*0.05, w*0.5, 0, Math.PI*2); ctx.fill();
+}
+function drawMarker(ctx, s, x, y, w, h) {
+  ctx.fillStyle = s.color;
+  ctx.fillRect(x + w*0.3, y + h*0.4, w*0.4, h*0.6);
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(x + w*0.3, y + h*0.4, w*0.4, 2);
 }
 
 // ===== WEAPON OVERLAY =====
