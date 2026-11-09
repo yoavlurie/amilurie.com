@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Scene Partner — Ami Lurie</title>
+  <meta name="description" content="Scene Partner: paste a script, pick your part, and an AI scene partner reads everyone else's lines. Or watch classic plays and musicals performed.">
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/scene-partner/scene-partner.css">
+</head>
+<body>
+
+  <div id="site-nav"></div>
+
+  <main>
+    <section class="sp-hero">
+      <div class="container">
+        <div class="sp-hero-mask" aria-hidden="true">&#127917;</div>
+        <h1>Scene Partner</h1>
+        <p class="sp-hero-sub">Rehearse your lines with an AI scene partner &mdash; or sit back and watch a scene performed.</p>
+        <div class="sp-tabs" role="tablist" aria-label="Mode">
+          <button class="sp-tab" role="tab" id="tab-rehearse" aria-controls="view-rehearse" aria-selected="true" type="button">Rehearse</button>
+          <button class="sp-tab" role="tab" id="tab-perform" aria-controls="view-perform" aria-selected="false" type="button">Performance</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="container sp-wrap">
+      <div class="sp-banner hidden" id="sp-no-speech" role="status">
+        This browser can't speak out loud, so other characters' lines will appear on screen for a few seconds instead. Try Chrome, Safari, or Edge for voices.
+      </div>
+
+      <!-- ================= REHEARSE ================= -->
+      <section id="view-rehearse" role="tabpanel" aria-labelledby="tab-rehearse">
+
+        <div class="sp-step">
+          <div class="sp-step-head">
+            <span class="sp-step-num">1</span>
+            <h2>Your script</h2>
+          </div>
+          <label class="sr-only" for="sp-script">Paste your script</label>
+          <textarea id="sp-script" class="sp-textarea" spellcheck="false" placeholder="Paste your script here, like this:
+
+ROMEO: But soft, what light through yonder window breaks?
+JULIET: Ay me!
+(Romeo steps out of the shadows.)
+ROMEO: She speaks."></textarea>
+          <div class="sp-row">
+            <label class="btn btn-secondary sp-btn-sm" for="sp-file">Upload .txt</label>
+            <input type="file" id="sp-file" accept=".txt,.md,.fountain,.text,text/plain" class="sr-only">
+            <select id="sp-sample" class="sp-select" aria-label="Load a sample scene">
+              <option value="">Try a sample scene&hellip;</option>
+            </select>
+            <button class="btn btn-secondary sp-btn-sm" id="sp-clear" type="button">Clear</button>
+          </div>
+          <p class="sp-parse-status" id="sp-parse-status" aria-live="polite"></p>
+          <details class="sp-help">
+            <summary>What formats work?</summary>
+            <ul>
+              <li><strong>NAME: line</strong> &mdash; <code>HAMLET: To be, or not to be</code></li>
+              <li><strong>NAME. line</strong> &mdash; the style used by most free Shakespeare texts</li>
+              <li><strong>Screenplay style</strong> &mdash; the character name in CAPS on its own line, with their dialogue underneath</li>
+              <li>Anything in <code>(parentheses)</code> or <code>[brackets]</code> is a stage direction and won't be read as dialogue.</li>
+              <li>Copying from a PDF? Paste it in, then check the character list below looks right.</li>
+            </ul>
+          </details>
+        </div>
+
+        <div class="sp-step" id="sp-step-cast">
+          <div class="sp-step-head">
+            <span class="sp-step-num">2</span>
+            <h2>Who are you playing?</h2>
+          </div>
+          <p class="sp-muted" id="sp-cast-hint">Paste a script above and the characters will show up here.</p>
+          <div class="sp-chips" id="sp-chips" role="group" aria-label="Your characters"></div>
+          <details class="sp-help" id="sp-voices-box">
+            <summary>Scene partner voices</summary>
+            <div id="sp-voices"></div>
+          </details>
+        </div>
+
+        <div class="sp-step">
+          <div class="sp-step-head">
+            <span class="sp-step-num">3</span>
+            <h2>How do you want to rehearse?</h2>
+          </div>
+
+          <div class="sp-setting">
+            <span class="sp-setting-label">My lines</span>
+            <div class="sp-seg" role="radiogroup" aria-label="My lines" data-setting="maskMode">
+              <button type="button" role="radio" data-value="show">Show</button>
+              <button type="button" role="radio" data-value="hint">First letters</button>
+              <button type="button" role="radio" data-value="hide">Hidden</button>
+            </div>
+          </div>
+
+          <div class="sp-setting">
+            <span class="sp-setting-label">On my turn</span>
+            <div class="sp-seg" role="radiogroup" aria-label="On my turn" data-setting="turnMode">
+              <button type="button" role="radio" data-value="tap">I tap Next</button>
+              <button type="button" role="radio" data-value="listen" id="sp-listen-opt">It listens &#127908;</button>
+              <button type="button" role="radio" data-value="timed">Timed</button>
+            </div>
+          </div>
+
+          <div class="sp-setting">
+            <span class="sp-setting-label">Scene partner reads</span>
+            <div class="sp-seg" role="radiogroup" aria-label="Scene partner reads" data-setting="cueOnly">
+              <button type="button" role="radio" data-value="false">Whole scene</button>
+              <button type="button" role="radio" data-value="true">Just my cues</button>
+            </div>
+          </div>
+
+          <div class="sp-setting">
+            <label class="sp-setting-label" for="sp-rate">Speed</label>
+            <div class="sp-rate">
+              <input type="range" id="sp-rate" min="0.6" max="1.5" step="0.05" value="1">
+              <output id="sp-rate-out" for="sp-rate">1.0&times;</output>
+            </div>
+          </div>
+
+          <label class="sp-check">
+            <input type="checkbox" id="sp-readdirs">
+            <span>Read stage directions out loud</span>
+          </label>
+
+          <p class="sp-muted sp-small" id="sp-turn-note"></p>
+        </div>
+
+        <div class="sp-play-row">
+          <button class="sp-play" id="sp-play" type="button" disabled>
+            <span aria-hidden="true">&#9654;</span> PLAY
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= PERFORMANCE ================= -->
+      <section id="view-perform" role="tabpanel" aria-labelledby="tab-perform" hidden>
+        <div class="sp-search">
+          <label class="sr-only" for="sp-q">Search plays and musicals</label>
+          <input type="search" id="sp-q" class="sp-search-input" placeholder="Search a play, character, or famous line&hellip;" autocomplete="off">
+          <div class="sp-filters" role="group" aria-label="Filter">
+            <button type="button" class="sp-filter" data-kind="" aria-pressed="true">All</button>
+            <button type="button" class="sp-filter" data-kind="play" aria-pressed="false">Plays</button>
+            <button type="button" class="sp-filter" data-kind="musical" aria-pressed="false">Musicals</button>
+            <button type="button" class="sp-filter" data-kind="monologue" aria-pressed="false">Monologues</button>
+            <button type="button" class="sp-filter sp-surprise" id="sp-surprise">&#127922; Surprise me</button>
+          </div>
+        </div>
+        <div class="sp-results" id="sp-results"></div>
+        <p class="sp-muted sp-small sp-pd-note">Every scene in the library is in the public domain. Have a script for a newer show? Paste it into <a href="#" id="sp-goto-rehearse">Rehearse</a> and press PLAY with nobody selected to hear the whole thing.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- ================= STAGE ================= -->
+  <div class="sp-stage" id="sp-stage" hidden role="dialog" aria-modal="true" aria-labelledby="sp-stage-title">
+    <div class="sp-stage-top">
+      <button class="sp-icon-btn" id="sp-exit" type="button" aria-label="Exit">&#10005;</button>
+      <div class="sp-stage-titles">
+        <div class="sp-stage-title" id="sp-stage-title">Scene</div>
+        <div class="sp-stage-sub" id="sp-stage-sub"></div>
+      </div>
+      <select id="sp-stage-rate" class="sp-stage-rate" aria-label="Speed">
+        <option value="0.75">0.75&times;</option>
+        <option value="0.9">0.9&times;</option>
+        <option value="1">1&times;</option>
+        <option value="1.15">1.15&times;</option>
+        <option value="1.3">1.3&times;</option>
+      </select>
+    </div>
+    <div class="sp-progress"><div class="sp-progress-fill" id="sp-progress"></div></div>
+
+    <div class="sp-stage-scroll" id="sp-stage-scroll">
+      <div class="sp-stage-lines" id="sp-stage-lines"></div>
+      <div class="sp-curtain hidden" id="sp-curtain">
+        <div class="sp-curtain-mask" aria-hidden="true">&#127917;</div>
+        <h2>Curtain!</h2>
+        <p id="sp-curtain-stats"></p>
+        <div class="sp-curtain-btns">
+          <button class="sp-btn-stage" id="sp-again" type="button">&#8635; Run it again</button>
+          <button class="sp-btn-stage sp-btn-ghost" id="sp-done" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp-turn hidden" id="sp-turn" aria-live="polite">
+      <div class="sp-turn-bar"><div class="sp-turn-fill" id="sp-turn-fill"></div></div>
+      <span id="sp-turn-text">Your line!</span>
+    </div>
+
+    <div class="sp-controls">
+      <button class="sp-ctrl" id="sp-restart" type="button" aria-label="Start over">&#8635;</button>
+      <button class="sp-ctrl" id="sp-back" type="button" aria-label="Previous line">&#9198;</button>
+      <button class="sp-ctrl sp-ctrl-main" id="sp-pause" type="button" aria-label="Pause">&#10074;&#10074;</button>
+      <button class="sp-ctrl sp-ctrl-next" id="sp-next" type="button" aria-label="Next line">Next &#9654;</button>
+    </div>
+  </div>
+
+  <div class="sp-toast hidden" id="sp-toast" role="status"></div>
+
+  <div id="site-footer"></div>
+
+  <script src="assets/components.js"></script>
+  <script src="assets/script.js" defer></script>
+  <script src="assets/scene-partner/library.js"></script>
+  <script src="assets/scene-partner/parser.js"></script>
+  <script src="assets/scene-partner/app.js" defer></script>
+</body>
+</html>

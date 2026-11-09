@@ -12,7 +12,8 @@ var SiteComponents = (function () {
     { label: "About", href: "about.html" },
     { label: "Games", href: "games.html" },
     { label: "Myth-o-Magic", href: "myth-o-magic.html" },
-    { label: "Adventure", href: "adventure.html" }
+    { label: "Adventure", href: "adventure.html" },
+    { label: "Scene Partner", href: "scene-partner.html" }
   ];
 
   /**
