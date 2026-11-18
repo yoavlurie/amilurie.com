@@ -16,7 +16,6 @@
 
   var JOINERS = /^(of|the|de|la|le|von|van|and|&|du|da|del|di|y|in|st\.?)$/i;
   var NOT_NAMES = /^(ACT|SCENE|INT|EXT|NOTE|NOTES|SETTING|TIME|PLACE|CHARACTERS|CAST|CAST OF CHARACTERS|DRAMATIS PERSONAE|SONG|LYRICS|TITLE|BY|PAGE|FADE IN|FADE OUT|CUT TO|THE END|CURTAIN|BLACKOUT|END|PROLOGUE|EPILOGUE|CONTINUED|MORE|LATER|MEANWHILE|SUPER|TRANSITION|MUSIC|SFX|SOUND|LIGHTS|WHERE|WHEN|HTTP|HTTPS|PS|P\.S|TIP|TIPS|SCENE PARTNER)$/;
-  var EVERYONE = /^(ALL|BOTH|EVERYONE|EVERYBODY|TOGETHER|COMPANY|ENSEMBLE)$/;
 
   var HEADING_RES = [
     /^#{1,3}\s+\S/,
@@ -126,6 +125,139 @@
     return parts.length > 1 ? parts : [key];
   }
 
+
+  /* ---------- Group lines and who's onstage ---------- */
+
+  var GROUP_RE = /^(ALL|EVERYONE|EVERYBODY|BOTH|TOGETHER|COMPANY|ENSEMBLE|OTHERS|THE OTHERS|THE REST|ALL OTHERS|EVERYONE ELSE|ALL THE OTHERS)(?:\s+(TWO|THREE|FOUR|FIVE|SIX|OF THEM|OF US))?(?:\s+(?:BUT|EXCEPT|MINUS|WITHOUT|APART FROM)\s+(.+))?$/;
+
+  /* Returns {kind, except} if a cue name means a group, else null */
+  function groupInfo(key) {
+    var m = String(key).toUpperCase().match(GROUP_RE);
+    if (!m) return null;
+    var kind = m[1] === "BOTH" ? "both" : /OTHER|REST|ELSE/.test(m[1]) ? "others" : "all";
+    return { kind: kind, except: m[3] || "" };
+  }
+
+  var TITLE_WORDS = /^(THE|OF|A|AN|AND|MR|MRS|MS|MISS|DR|PROFESSOR|PROF|LADY|LORD|SIR|DAME|KING|QUEEN|PRINCE|PRINCESS|CAPTAIN|FIRST|SECOND|THIRD|FOURTH|FIFTH|OLD|YOUNG|LITTLE|BIG|MAJOR|GENERAL|AUNT|UNCLE|SISTER|BROTHER|MOTHER|FATHER|ST|SAINT|HEAD|HEADMASTER|HEADMISTRESS|DUKE|DUCHESS|MADAME|MONSIEUR|SENOR|SENORA|COUNT|BARON)$/;
+
+  /* Build a lookup from words in directions to characters.
+     "BLONDO MALFOY" can be called BLONDO or MALFOY. A word several
+     characters share (WITCH in FIRST/SECOND/THIRD WITCH) means all of them. */
+  function buildAliases(keys) {
+    var tokenTo = {};
+    keys.forEach(function (k) {
+      var toks = k.split(/[\s\-]+/).filter(function (t) { return t.length >= 2; });
+      toks.forEach(function (t) {
+        (tokenTo[t] = tokenTo[t] || []).push(k);
+      });
+    });
+    var phrases = [];
+    keys.forEach(function (k) { phrases.push({ text: k, keys: [k] }); });
+    Object.keys(tokenTo).forEach(function (t) {
+      var ks = tokenTo[t];
+      if (ks.length === 1 && TITLE_WORDS.test(t)) return;
+      if (ks.length === 1 && keys.indexOf(t) >= 0) return;
+      phrases.push({ text: t, keys: ks });
+      if (!/S$/.test(t)) {
+        phrases.push({ text: t + "S", keys: ks });
+        phrases.push({ text: t + "ES", keys: ks });
+      }
+    });
+    phrases.sort(function (a, b) { return b.text.length - a.text.length; });
+    return phrases;
+  }
+
+  function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+  /* Which characters does this text mention? Longest names win. */
+  function mentions(text, phrases) {
+    var up = " " + String(text).toUpperCase().replace(/[^A-Z0-9'\- ]+/g, " ") + " ";
+    var found = [];
+    phrases.forEach(function (ph) {
+      var re = new RegExp("(^|[^A-Z0-9'])" + escRe(ph.text) + "(?=[^A-Z0-9']|$)");
+      if (re.test(up)) {
+        up = up.replace(new RegExp("(^|[^A-Z0-9'])" + escRe(ph.text) + "(?=[^A-Z0-9']|$)", "g"), "$1 ");
+        ph.keys.forEach(function (k) { if (found.indexOf(k) < 0) found.push(k); });
+      }
+    });
+    return found;
+  }
+
+  var EXIT_RE = /\b(exit|exits|exiting|exeunt|leave|leaves|leaving|runs? (off|out|away)|walks? (off|out|away)|storms? (off|out)|goes (off|out)|go (off|out)|disappears?|vanish(es)?|flees?|hurries (off|out)|dashes (off|out)|is dragged (off|out)|are dragged (off|out))\b/i;
+  var EXEUNT_RE = /\b(exeunt|(all|everyone|everybody) (exit|leave|go|run off|exits|leaves))\b/i;
+  var EXCEPT_RE = /\b(but|except|apart from|all but|save)\b/i;
+
+  /* Walk the script once, keeping track of who is onstage,
+     and resolve group lines (ALL, BOTH, EVERYONE ELSE...) to real characters. */
+  function stage(items, keys) {
+    var phrases = buildAliases(keys);
+    var onstage = [];
+    var spokenSoFar = [];
+    var recent = [];
+
+    function add(k) { if (onstage.indexOf(k) < 0) onstage.push(k); }
+    function remove(k) { var i = onstage.indexOf(k); if (i >= 0) onstage.splice(i, 1); }
+
+    items.forEach(function (it) {
+      if (it.type === "dir") {
+        var clauses = it.text.split(/[.;!?]+\s*|\s+then\s+/i).filter(Boolean);
+        clauses.forEach(function (c) {
+          var names = mentions(c, phrases);
+          if (EXEUNT_RE.test(c)) {
+            if (names.length && EXCEPT_RE.test(c)) onstage = names.slice();
+            else if (names.length && !/\b(all|everyone|everybody)\b/i.test(c)) names.forEach(remove);
+            else onstage = [];
+          } else if (EXIT_RE.test(c)) {
+            if (names.length) names.forEach(remove);
+            else if (recent.length) remove(recent[recent.length - 1]);
+          } else {
+            names.forEach(add);
+          }
+        });
+        it.onstage = onstage.slice();
+        return;
+      }
+      if (it.type !== "line") return;
+
+      var g = groupInfo(it.key);
+      if (!g) {
+        it.chars.forEach(function (k) {
+          add(k);
+          if (spokenSoFar.indexOf(k) < 0) spokenSoFar.push(k);
+          var ri = recent.indexOf(k);
+          if (ri >= 0) recent.splice(ri, 1);
+          recent.push(k);
+        });
+        return;
+      }
+
+      /* Everyone onstage... */
+      var base = onstage.length ? onstage.slice() : (spokenSoFar.length ? spokenSoFar.slice() : keys.slice());
+      if (g.kind === "both") {
+        var two = recent.filter(function (k) { return base.indexOf(k) >= 0; }).slice(-2);
+        if (two.length < 2) two = recent.slice(-2);
+        if (two.length === 2) base = two;
+      }
+      if (g.kind === "others" && recent.length) {
+        var last = recent[recent.length - 1];
+        base = base.filter(function (k) { return k !== last; });
+      }
+
+      /* ...except anyone named in "ALL BUT X" or "ALL (except X)" */
+      var exceptText = g.except;
+      var pm = it.text.match(/^\s*\(\s*(?:all\s+|everyone\s+)?(?:except|but|not|minus|without|apart from|save)\s+([^)]*)\)\s*/i);
+      if (pm) exceptText += " " + pm[1];
+      if (exceptText.trim()) {
+        var out = mentions(exceptText, phrases);
+        base = base.filter(function (k) { return out.indexOf(k) < 0; });
+      }
+
+      it.group = it.key;
+      if (base.length) it.chars = base;
+      else it.chars = [it.key];
+    });
+  }
+
   function parse(raw) {
     var src = String(raw || "").replace(/\r\n?/g, "\n").replace(/\t/g, "    ");
     var lines = src.split("\n").map(function (l) {
@@ -219,27 +351,32 @@
     }
     if (pending) pushDir(pending, "dir");
 
+    /* Who's who: everyone with a line of their own */
+    var speakers = {};
+    items.forEach(function (it) {
+      if (it.type === "line" && it.chars.length === 1 && !groupInfo(it.key)) speakers[it.key] = true;
+    });
+
     /* A combo like "HATTER & MARCH HARE" only counts as a shared line
        if each part also speaks on their own somewhere. */
-    var solo = {};
-    items.forEach(function (it) {
-      if (it.type === "line" && it.chars.length === 1) solo[it.key] = true;
-    });
     items.forEach(function (it) {
       if (it.type === "line" && it.chars.length > 1) {
-        var ok = it.chars.every(function (k) { return solo[k]; });
+        var ok = it.chars.every(function (k) { return speakers[k]; });
         if (!ok) it.chars = [it.key];
       }
     });
 
-    /* Character list */
+    stage(items, Object.keys(speakers));
+
+    /* Character list (groups like ALL are not characters) */
     var map = {};
     var order = [];
     items.forEach(function (it) {
       if (it.type !== "line") return;
       it.chars.forEach(function (k) {
+        if (groupInfo(k)) return;
         if (!map[k]) {
-          map[k] = { key: k, name: titleCase(k), count: 0, words: 0, everyone: EVERYONE.test(k) };
+          map[k] = { key: k, name: titleCase(k), count: 0, words: 0 };
           order.push(k);
         }
         map[k].count++;
@@ -248,7 +385,6 @@
     });
 
     var characters = order.map(function (k) { return map[k]; }).sort(function (a, b) {
-      if (a.everyone !== b.everyone) return a.everyone ? 1 : -1;
       return b.count - a.count;
     });
 
@@ -269,7 +405,7 @@
       .trim();
   }
 
-  var api = { parse: parse, spokenText: spokenText, titleCase: titleCase };
+  var api = { parse: parse, spokenText: spokenText, titleCase: titleCase, groupInfo: groupInfo };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.SPParser = api;
 })(typeof window !== "undefined" ? window : this);
