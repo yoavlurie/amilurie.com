@@ -1,7 +1,8 @@
 /* ============================================
    Scene Partner — App
    Rehearse: paste a script, pick your part(s),
-   the browser's voices read everyone else.
+   and a scene partner performs everyone else —
+   with character voices, emotions, and sound effects.
    Performance: pick a scene from the library and
    every part is performed for you.
    ============================================ */
@@ -11,8 +12,15 @@
 
   var LIB = window.SP_LIBRARY || [];
   var Parser = window.SPParser;
+  var Director = window.SPDirector;
+  var SFX = window.SPSfx;
+  var Voices = window.SPVoices;
+  var Browser = Voices.Browser;
+  var AI = Voices.AI;
   var STORE_KEY = "scenePartner.v1";
   var COLORS = ["#8fb8ff", "#ff9fb2", "#9fe3b4", "#c9a7ff", "#ffc685", "#7fe0e0", "#ff8f8f", "#d8e47f", "#f0a6e8", "#a6c4f0"];
+
+  Director.loadWords("assets/scene-partner/words.txt");
 
   function $(id) { return document.getElementById(id); }
 
@@ -36,160 +44,6 @@
       try { localStorage.setItem(STORE_KEY, JSON.stringify(obj)); } catch (e) { /* private mode */ }
     }
   };
-
-  /* ============================================
-     Speech synthesis
-     ============================================ */
-
-  var Speech = (function () {
-    var synth = window.speechSynthesis;
-    var supported = !!synth && typeof window.SpeechSynthesisUtterance !== "undefined";
-    var voices = [];
-    var listeners = [];
-    var keep = [];
-    var gen = 0;
-    var lastCancel = 0;
-
-    var FEMALE = /(female|woman|samantha|karen|moira|tessa|victoria|fiona|veena|serena|allison|ava|susan|zira|hazel|kate|catherine|nicky|zoe|joanna|salli|kimberly|ivy|emma|amy|libby|sonia|aria|jenny|michelle|natasha|clara|kendra|ruth|olivia|isha|heera|ellie|martha|stephanie|nora|flo|sandy|shelley|grandma|aurora|ana\b|siri.*voice [24])/i;
-    var MALE = /(\bmale|\bman\b|daniel|alex\b|fred|rishi|oliver|\btom\b|aaron|arthur|gordon|\blee\b|david|mark|george|james|ryan|guy|eric|christopher|brian|matthew|joey|justin|evan|nathan|reed|ralph|junior|thomas|william|liam|noah|ravi|prabhat|grandpa|rocko|eddy|steffan|andrew|roger|siri.*voice [13])/i;
-    var NOVELTY = /(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|good news|hysterical|jester|organ|pipe organ|superstar|trinoids|whisper|wobble|zarvox|eloquence)/i;
-
-    function load() {
-      if (!supported) return;
-      var v = synth.getVoices() || [];
-      if (v.length && v.length !== voices.length) {
-        voices = v.slice();
-        listeners.forEach(function (f) { f(); });
-      }
-    }
-
-    if (supported) {
-      load();
-      if (typeof synth.addEventListener === "function") synth.addEventListener("voiceschanged", load);
-      else synth.onvoiceschanged = load;
-      setTimeout(load, 400);
-      setTimeout(load, 1500);
-      setTimeout(load, 4000);
-    }
-
-    function gender(v) {
-      var n = v.name + " " + (v.voiceURI || "");
-      if (FEMALE.test(n)) return "f";
-      if (MALE.test(n)) return "m";
-      return "";
-    }
-
-    function score(v) {
-      var s = 0;
-      if (/natural|neural|premium|enhanced|siri/i.test(v.name)) s += 4;
-      if (/google/i.test(v.name)) s += 2;
-      if (/^en[-_]US/i.test(v.lang)) s += 1;
-      if (/^en[-_](GB|AU|IE|CA)/i.test(v.lang)) s += 0.7;
-      if (v.localService) s += 0.3;
-      if (NOVELTY.test(v.name)) s -= 20;
-      return s;
-    }
-
-    function ranked() {
-      var en = voices.filter(function (v) { return /^en/i.test(v.lang); });
-      var pool = en.length ? en : voices.slice();
-      return pool.sort(function (a, b) { return score(b) - score(a); }).filter(function (v) { return score(v) > -10; });
-    }
-
-    function byURI(uri) {
-      for (var i = 0; i < voices.length; i++) if (voices[i].voiceURI === uri) return voices[i];
-      return null;
-    }
-
-    function sentenceChunks(text) {
-      var flat = text.replace(/\s*\n\s*/g, " ").trim();
-      if (!flat) return [];
-      var parts = flat.match(/[^.!?;:]+[.!?;:]*["'’”)\]]*\s*/g) || [flat];
-      var out = [];
-      var buf = "";
-      parts.forEach(function (p) {
-        if ((buf + p).length > 180 && buf) { out.push(buf.trim()); buf = ""; }
-        buf += p;
-      });
-      if (buf.trim()) out.push(buf.trim());
-      return out;
-    }
-
-    function lyricChunks(text) {
-      return text.split(/\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-    }
-
-    function cancel() {
-      gen++;
-      lastCancel = Date.now();
-      if (!supported) return;
-      try { synth.cancel(); } catch (e) { /* ignore */ }
-    }
-
-    /* Resolves when the text has been spoken (or skipped / cancelled). */
-    function speak(text, o) {
-      o = o || {};
-      var myGen = gen;
-      var chunks = o.lyric ? lyricChunks(text) : sentenceChunks(text);
-      return new Promise(function (resolve) {
-        if (!supported || !chunks.length) { resolve(); return; }
-        var i = 0;
-        function nextChunk() {
-          if (myGen !== gen || i >= chunks.length) { resolve(); return; }
-          var c = chunks[i];
-          var k = i;
-          i++;
-          var u = new SpeechSynthesisUtterance(c);
-          if (o.voice) { u.voice = o.voice; u.lang = o.voice.lang; }
-          else u.lang = "en-US";
-          u.rate = clamp(o.rate || 1, 0.5, 2);
-          var p = (o.pitch || 1) * (o.lyric ? (k % 2 ? 1.07 : 0.95) : 1);
-          u.pitch = clamp(p, 0.3, 1.9);
-          u.volume = o.volume == null ? 1 : o.volume;
-          var done = false;
-          var words = c.split(/\s+/).length;
-          var wd = setTimeout(fin, 5000 + (words * 700) / u.rate);
-          function fin() {
-            if (done) return;
-            done = true;
-            clearTimeout(wd);
-            var ix = keep.indexOf(u);
-            if (ix >= 0) keep.splice(ix, 1);
-            nextChunk();
-          }
-          u.onend = fin;
-          u.onerror = fin;
-          keep.push(u);
-          try { if (synth.paused) synth.resume(); } catch (e) { /* ignore */ }
-          synth.speak(u);
-        }
-        if (Date.now() - lastCancel < 150) setTimeout(nextChunk, 150);
-        else nextChunk();
-      });
-    }
-
-    /* iOS needs the first utterance to come from a tap. */
-    function unlock() {
-      if (!supported) return;
-      try {
-        var u = new SpeechSynthesisUtterance(" ");
-        u.volume = 0;
-        synth.speak(u);
-      } catch (e) { /* ignore */ }
-    }
-
-    return {
-      supported: supported,
-      speak: speak,
-      cancel: cancel,
-      unlock: unlock,
-      ranked: ranked,
-      gender: gender,
-      byURI: byURI,
-      hasVoices: function () { return voices.length > 0; },
-      onVoices: function (f) { listeners.push(f); }
-    };
-  })();
 
   /* ============================================
      Speech recognition (for "It listens" mode)
@@ -299,67 +153,34 @@
     title: saved.title || "",
     lyric: !!saved.lyric,
     voiceOverrides: saved.voiceOverrides || {},
+    aiVoiceOverrides: saved.aiVoiceOverrides || {},
+    personaOverrides: saved.personaOverrides || {},
     rate: saved.rate || 1,
     maskMode: saved.maskMode || "show",
     turnMode: saved.turnMode || "tap",
     cueOnly: !!saved.cueOnly,
-    readDirs: !!saved.readDirs
+    readDirs: !!saved.readDirs,
+    sfx: saved.sfx !== false,
+    engine: saved.engine || "ai"
   };
   if (S.turnMode === "listen" && !Listener.supported) S.turnMode = "tap";
 
   var parsed = Parser.parse(S.script);
 
-  function persist() {
-    Store.save(S);
+  function persist() { Store.save(S); }
+
+  function aiReady() { return AI.state.available && !AI.state.failed; }
+  function engineNow() { return S.engine === "ai" && aiReady() ? "ai" : "browser"; }
+
+  /* Who everyone is, for the current script */
+  function personasFor(p, genders, overrides) {
+    return Director.cast(p, { genders: genders || {}, overrides: overrides || {} });
   }
 
-  /* ============================================
-     Casting: who gets which voice
-     ============================================ */
-
-  function guessGender(key) {
-    var k = " " + key.toUpperCase() + " ";
-    if (/ (LADY|QUEEN|MRS\.?|MISS|MS\.?|MOTHER|MOM|MUM|MA|GIRL|WOMAN|SISTER|AUNT|PRINCESS|DUCHESS|NURSE|WIFE|DAUGHTER|GRANDMA|GRANNY|MAID|MADAM|MADAME|DAME|NUN|EMPRESS|WITCH|GODDESS|SHE|HER) /.test(k)) return "f";
-    if (/ (LORD|KING|MR\.?|SIR|FATHER|DAD|PA|BOY|MAN|BROTHER|UNCLE|PRINCE|DUKE|HUSBAND|SON|GRANDPA|BUTLER|MONK|FRIAR|EMPEROR|GOD|CAPTAIN|KNIGHT|HE|HIM) /.test(k)) return "m";
-    if (/ (MARY|JULIET|ALICE|ANNA|ANNE|ANN|EMMA|SARAH|KATE|KATHERINE|ELIZABETH|LIZ|BETH|JANE|LUCY|SOPHIE|SOPHIA|OLIVIA|EMILY|GRACE|ROSE|LILY|HANNAH|LAURA|NORA|WENDY|DOROTHY|BELLE|ELSA|ANNIE|MAYA|MIA|ZOE|CHLOE|ELLA|IDA|LANA|PORTIA|ROSALIND|VIOLA|HERMIA|HELENA|TITANIA|OPHELIA|DESDEMONA|CORDELIA|BEATRICE|HERO|MIRANDA|GWENDOLEN|CECILY|ELIZA|JO|MEG|AMY|SUSAN|MARIA|LISA|JESSICA|EMILIA|PAULINA|HERMIONE|GINNY|LUNA|ARIEL|JASMINE|MOANA|MULAN|TIANA|ANYA|ELPHABA|GLINDA|NALA|DANIELLE|RACHEL|REBECCA|MOLLY|HOLLY|ABIGAIL|ABBY|AVA|ISABELLA|MADISON|NATALIE|SAMANTHA|VICTORIA|ROSALIE|RUTH|ESTHER|MIRIAM|NAOMI|LEAH) /.test(k)) return "f";
-    if (/ (ROMEO|HAMLET|MACBETH|OTHELLO|IAGO|LEAR|PUCK|OBERON|BOTTOM|QUINCE|BENVOLIO|MERCUTIO|TYBALT|HORATIO|BRUTUS|CAESAR|ANTONY|CASSIUS|PROSPERO|CALIBAN|BENEDICK|JACK|ALGERNON|SCROOGE|JOHN|JAMES|TOM|SAM|MAX|BEN|DAVID|MICHAEL|PETER|PAUL|GEORGE|HENRY|WILLIAM|HARRY|RON|NEVILLE|DRACO|PERCY|LUKE|LEO|NOAH|JONAH|ETHAN|JACOB|LIAM|MASON|LUCAS|OLIVER|ELI|AMI|YOAV|STEPHEN|MATT|MATTHEW|MARK|JOSH|JOSHUA|DANNY|DANIEL|CHARLIE|FRED|BOB|JIM|JOE|NICK|TONY|SIMBA|ALADDIN|SHREK|FIYERO|HAMILTON|BURR|SEYMOUR|JEAN|MARIUS|JAVERT) /.test(k)) return "m";
-    return "";
-  }
-
-  function buildCast(chars, genders, overrides) {
-    var all = Speech.ranked();
-    var female = all.filter(function (v) { return Speech.gender(v) === "f"; });
-    var male = all.filter(function (v) { return Speech.gender(v) === "m"; });
-    var uses = {};
-    var pitchSteps = [1, 0.88, 1.12, 0.78, 1.22, 0.94, 1.06, 0.84, 1.16];
-    var cast = {};
-
-    chars.forEach(function (key, i) {
-      var g = genders[key] || guessGender(key);
-      var v = overrides[key] ? Speech.byURI(overrides[key]) : null;
-      if (!v && all.length) {
-        var pool = g === "f" && female.length ? female : g === "m" && male.length ? male : all;
-        for (var j = 0; j < pool.length; j++) {
-          if (!uses[pool[j].voiceURI]) { v = pool[j]; break; }
-        }
-        if (!v) v = pool[i % pool.length];
-      }
-      var n = v ? (uses[v.voiceURI] = (uses[v.voiceURI] || 0) + 1) : 1;
-      var pitch = pitchSteps[(n - 1) % pitchSteps.length];
-      if (v && !overrides[key]) {
-        var vg = Speech.gender(v);
-        if (g === "f" && vg === "m") pitch *= 1.3;
-        if (g === "m" && vg === "f") pitch *= 0.8;
-      }
-      cast[key] = { voice: v, pitch: pitch, color: COLORS[i % COLORS.length], gender: g };
-    });
-
-    var narr = null;
-    for (var q = 0; q < all.length; q++) {
-      if (!uses[all[q].voiceURI]) { narr = all[q]; break; }
-    }
-    cast.__narrator = { voice: narr || all[0] || null, pitch: 1, color: "", gender: "" };
-    return cast;
+  function colorMap(chars) {
+    var m = {};
+    chars.forEach(function (c, i) { m[c.key] = COLORS[i % COLORS.length]; });
+    return m;
   }
 
   /* ============================================
@@ -380,7 +201,9 @@
     rate: $("sp-rate"),
     rateOut: $("sp-rate-out"),
     readDirs: $("sp-readdirs"),
-    turnNote: $("sp-turn-note")
+    sfxBox: $("sp-sfx"),
+    turnNote: $("sp-turn-note"),
+    engineNote: $("sp-engine-note")
   };
 
   function fillSamples() {
@@ -399,6 +222,8 @@
     S.lyric = entry.kind === "musical";
     S.mine = [];
     S.voiceOverrides = {};
+    S.aiVoiceOverrides = {};
+    S.personaOverrides = {};
     els.script.value = S.script;
     onScriptChange(true);
   }
@@ -419,7 +244,7 @@
       persist();
     };
     if (immediate === true) run();
-    else parseTimer = setTimeout(run, 250);
+    else parseTimer = setTimeout(run, 300);
   }
 
   function renderStatus() {
@@ -437,7 +262,7 @@
     }
     els.play.disabled = !lines;
     els.castHint.textContent = lines
-      ? "Tap the character (or characters) you're playing. Pick nobody to just listen to the whole scene."
+      ? "Tap the character (or characters) you're playing. Pick nobody to just watch the whole scene."
       : "Paste a script above and the characters will show up here.";
   }
 
@@ -469,70 +294,152 @@
     for (var i = 0; i < chips.length; i++) {
       chips[i].setAttribute("aria-pressed", S.mine.indexOf(chips[i].dataset.key) >= 0 ? "true" : "false");
     }
-    var label = S.mine.length ? "▶ PLAY" : "▶ PLAY SCENE";
-    els.play.innerHTML = '<span aria-hidden="true">' + label.slice(0, 1) + "</span> " + label.slice(2);
+    var label = S.mine.length ? "PLAY" : "PLAY SCENE";
+    els.play.innerHTML = '<span aria-hidden="true">&#9654;</span> ' + label;
+  }
+
+  /* ---------- Cast & voices panel ---------- */
+
+  var ACCENT_OPTIONS = ["american", "british", "french", "spanish", "italian", "german", "dutch", "russian", "irish", "scottish", "australian", "southern", "indian", "swedish", "japanese", "pirate"];
+  var STYLE_OPTIONS = ["bratty", "villain", "squeaky", "booming", "hissing", "robotic", "ghostly", "raspy", "posh", "cheerful", "silly", "grumpy", "nervous", "sleepy", "wise", "royal", "sweet", "heroic", "dramatic"];
+  var AGE_OPTIONS = ["kid", "teen", "adult", "old"];
+
+  function optionList(list, labels, current, autoLabel) {
+    var h = '<option value="">' + esc(autoLabel) + "</option>";
+    list.forEach(function (v) {
+      h += '<option value="' + v + '"' + (current === v ? " selected" : "") + ">" + esc(labels[v] || v) + "</option>";
+    });
+    return h;
   }
 
   function renderVoices() {
-    var others = parsed.characters.filter(function (c) { return S.mine.indexOf(c.key) < 0; });
-    if (!others.length || !Speech.supported) {
+    if (!parsed.characters.length) {
       els.voicesBox.classList.add("hidden");
       return;
     }
     els.voicesBox.classList.remove("hidden");
-    var list = Speech.ranked();
-    var cast = buildCast(parsed.characters.map(function (c) { return c.key; }), S.genders, S.voiceOverrides);
-    var html = "";
-    if (!list.length) html = '<p class="sp-muted sp-small">Loading voices&hellip;</p>';
-    others.forEach(function (c) {
-      var cur = cast[c.key] && cast[c.key].voice;
-      html += '<div class="sp-voice-row"><span class="sp-voice-name" style="color:' + cast[c.key].color + '">' + esc(c.name) + "</span>";
-      html += '<select class="sp-select" data-key="' + esc(c.key) + '" aria-label="Voice for ' + esc(c.name) + '">';
-      html += '<option value="">Auto' + (cur ? " (" + esc(cur.name) + ")" : "") + "</option>";
-      list.forEach(function (v) {
-        var sel = S.voiceOverrides[c.key] === v.voiceURI ? " selected" : "";
-        html += '<option value="' + esc(v.voiceURI) + '"' + sel + ">" + esc(v.name) + " · " + esc(v.lang) + "</option>";
-      });
-      html += '</select><button type="button" class="sp-voice-play" data-key="' + esc(c.key) + '" aria-label="Hear ' + esc(c.name) + '">▶</button></div>';
+    var engine = engineNow();
+    var auto = personasFor(parsed, S.genders, {});
+    var personas = personasFor(parsed, S.genders, S.personaOverrides);
+    var perf = new Voices.Performer({
+      engine: engine, personas: personas, rate: S.rate,
+      browserOverrides: S.voiceOverrides, aiOverrides: S.aiVoiceOverrides
+    });
+    var colors = colorMap(parsed.characters);
+    var browserList = Browser.ranked().concat(otherLangVoices());
+    var html = '<p class="sp-muted sp-small sp-cast-intro">Scene Partner reads the script to work out who everyone is. Change anything it got wrong.</p>';
+    parsed.characters.forEach(function (c) {
+      var p = personas[c.key];
+      var a = auto[c.key];
+      var ov = S.personaOverrides[c.key] || {};
+      var mine = S.mine.indexOf(c.key) >= 0;
+      var curVoice = engine === "ai" ? perf.aiVoices[c.key] : perf.browserVoices[c.key];
+      html += '<div class="sp-cast-row' + (mine ? " is-mine" : "") + '" data-key="' + esc(c.key) + '">';
+      html += '<div class="sp-cast-head"><span class="sp-voice-name" style="color:' + colors[c.key] + '">' + esc(c.name) + "</span>";
+      html += '<span class="sp-cast-label">' + (mine ? "you" : esc(p.label || "regular voice")) + "</span>";
+      if (!mine) html += '<button type="button" class="sp-voice-play" data-key="' + esc(c.key) + '" aria-label="Hear ' + esc(c.name) + '">▶</button>';
+      html += "</div>";
+      if (!mine) {
+        html += '<div class="sp-cast-selects">';
+        html += '<select class="sp-select" data-field="accent" aria-label="Accent">' +
+          optionList(ACCENT_OPTIONS, Director.accentNames, ov.accent, "Accent: " + (a.accent ? Director.accentNames[a.accent] : "auto")) + "</select>";
+        html += '<select class="sp-select" data-field="style" aria-label="Personality">' +
+          optionList(STYLE_OPTIONS, Director.styleLabels, ov.style, "Style: " + (a.styles[0] ? (Director.styleLabels[a.styles[0]] || a.styles[0]) : "auto")) + "</select>";
+        html += '<select class="sp-select" data-field="age" aria-label="Age">' +
+          optionList(AGE_OPTIONS, { kid: "kid", teen: "teen", adult: "grown-up", old: "older" }, ov.age, "Age: " + a.age.replace("adult", "grown-up")) + "</select>";
+        html += '<select class="sp-select" data-field="voice" aria-label="Voice">';
+        html += '<option value="">Voice: ' + esc(curVoice ? curVoice.name : "auto") + "</option>";
+        if (engine === "ai") {
+          AI.state.voices.forEach(function (v) {
+            var L = v.labels || {};
+            var sel = S.aiVoiceOverrides[c.key] === v.id ? " selected" : "";
+            html += '<option value="' + esc(v.id) + '"' + sel + ">" + esc(v.name) + (L.accent ? " · " + esc(L.accent) : "") + (L.gender ? " · " + esc(L.gender) : "") + "</option>";
+          });
+        } else {
+          browserList.forEach(function (v) {
+            var sel = S.voiceOverrides[c.key] === v.voiceURI ? " selected" : "";
+            html += '<option value="' + esc(v.voiceURI) + '"' + sel + ">" + esc(v.name) + " · " + esc(v.lang) + "</option>";
+          });
+        }
+        html += "</select></div>";
+      }
+      html += "</div>";
     });
     els.voices.innerHTML = html;
+  }
+
+  /* Voices in other languages give accents (a French voice reading English) */
+  function otherLangVoices() {
+    var out = [];
+    var seen = {};
+    Browser.ranked().forEach(function (v) { seen[v.voiceURI] = 1; });
+    var all = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    all.forEach(function (v) { if (!seen[v.voiceURI]) out.push(v); });
+    return out.sort(function (a, b) { return a.lang < b.lang ? -1 : 1; });
   }
 
   els.voices.addEventListener("change", function (e) {
     var t = e.target;
     if (t.tagName !== "SELECT") return;
-    if (t.value) S.voiceOverrides[t.dataset.key] = t.value;
-    else delete S.voiceOverrides[t.dataset.key];
+    var row = t.closest(".sp-cast-row");
+    if (!row) return;
+    var key = row.dataset.key;
+    var field = t.dataset.field;
+    if (field === "voice") {
+      var store = engineNow() === "ai" ? S.aiVoiceOverrides : S.voiceOverrides;
+      if (t.value) store[key] = t.value;
+      else delete store[key];
+    } else {
+      var ov = S.personaOverrides[key] || {};
+      if (t.value) ov[field] = t.value;
+      else delete ov[field];
+      S.personaOverrides[key] = ov;
+    }
     persist();
+    renderVoices();
   });
 
   els.voices.addEventListener("click", function (e) {
     var t = e.target.closest(".sp-voice-play");
     if (!t) return;
-    var key = t.dataset.key;
-    var cast = buildCast(parsed.characters.map(function (c) { return c.key; }), S.genders, S.voiceOverrides);
-    var first = null;
-    for (var i = 0; i < parsed.items.length; i++) {
-      var it = parsed.items[i];
-      if (it.type === "line" && (it.key === key || it.chars.indexOf(key) >= 0)) { first = it; break; }
-    }
-    var text = first ? Parser.spokenText(first.text).split(/\n/).slice(0, 2).join(" ") : "Hello.";
-    Speech.cancel();
-    Speech.speak(text, { voice: cast[key].voice, pitch: cast[key].pitch, rate: S.rate });
+    previewCharacter(t.dataset.key);
   });
 
-  /* Settings controls */
+  var previewPerformer = null;
+  function previewCharacter(key) {
+    Voices.Audio.unlock();
+    Browser.unlock();
+    if (previewPerformer) previewPerformer.cancel();
+    var personas = personasFor(parsed, S.genders, S.personaOverrides);
+    var emos = Director.emotions(parsed, personas);
+    var idx = -1;
+    for (var i = 0; i < parsed.items.length; i++) {
+      var it = parsed.items[i];
+      if (it.type === "line" && !it.group && it.chars[0] === key) { idx = i; break; }
+    }
+    var item = idx >= 0 ? parsed.items[idx] : { type: "line", key: key, chars: [key], text: "Hello there!" };
+    if (item.text.length > 220) item = { type: "line", key: key, chars: [key], text: item.text.slice(0, 200).replace(/\s+\S*$/, "") + "." };
+    previewPerformer = new Voices.Performer({
+      engine: engineNow(), personas: personas, rate: S.rate,
+      browserOverrides: S.voiceOverrides, aiOverrides: S.aiVoiceOverrides
+    });
+    previewPerformer.onFallback = onAIFallback;
+    previewPerformer.speak(item, idx >= 0 ? emos[idx] : {});
+  }
+
+  /* ---------- Settings ---------- */
 
   function initSegs() {
     var segs = document.querySelectorAll(".sp-seg");
     Array.prototype.forEach.call(segs, function (seg) {
       var setting = seg.dataset.setting;
       function sync() {
-        var val = String(S[setting]);
+        var val = String(setting === "engine" ? engineNow() : S[setting]);
         Array.prototype.forEach.call(seg.querySelectorAll("button"), function (b) {
           b.setAttribute("aria-checked", b.dataset.value === val ? "true" : "false");
         });
         if (setting === "turnMode") renderTurnNote();
+        if (setting === "engine") renderEngineNote();
       }
       seg.addEventListener("click", function (e) {
         var b = e.target.closest("button");
@@ -541,7 +448,9 @@
         S[setting] = v === "true" ? true : v === "false" ? false : v;
         sync();
         persist();
+        if (setting === "engine") renderVoices();
       });
+      seg._sync = sync;
       sync();
     });
     if (!Listener.supported) {
@@ -549,6 +458,22 @@
       opt.disabled = true;
       opt.title = "Your browser can't listen. Try Chrome or Edge.";
     }
+  }
+
+  function syncSegs() {
+    Array.prototype.forEach.call(document.querySelectorAll(".sp-seg"), function (seg) { if (seg._sync) seg._sync(); });
+  }
+
+  function renderEngineNote() {
+    var aiBtn = $("sp-engine-ai");
+    aiBtn.disabled = !aiReady();
+    var t = "";
+    if (!AI.state.checked) t = "Checking for AI voices…";
+    else if (AI.state.failed) t = "AI voices stopped working (" + (AI.state.reason || "error") + "), so the free voices are filling in.";
+    else if (!AI.state.available) t = "AI voices aren't switched on for this site yet, so it's using the voices built into this device. They can do accents, speed and pitch, but not real emotions.";
+    else if (engineNow() === "ai") t = "AI voices act out every line with emotion, accents and character. The first line can take a second to load.";
+    else t = "Free voices are built into this device: quick, but less expressive.";
+    els.engineNote.textContent = t;
   }
 
   function renderTurnNote() {
@@ -559,17 +484,25 @@
     els.turnNote.textContent = t;
   }
 
+  function fmtRate(r) { return Number(r).toFixed(2).replace(/0$/, "") + "×"; }
+
   els.rate.value = S.rate;
-  els.rateOut.textContent = Number(S.rate).toFixed(2).replace(/0$/, "") + "×";
+  els.rateOut.textContent = fmtRate(S.rate);
   els.rate.addEventListener("input", function () {
     S.rate = parseFloat(els.rate.value);
-    els.rateOut.textContent = S.rate.toFixed(2).replace(/0$/, "") + "×";
+    els.rateOut.textContent = fmtRate(S.rate);
     persist();
   });
 
   els.readDirs.checked = S.readDirs;
   els.readDirs.addEventListener("change", function () {
     S.readDirs = els.readDirs.checked;
+    persist();
+  });
+
+  els.sfxBox.checked = S.sfx;
+  els.sfxBox.addEventListener("change", function () {
+    S.sfx = els.sfxBox.checked;
     persist();
   });
 
@@ -591,6 +524,7 @@
       S.genders = {};
       S.lyric = false;
       S.mine = [];
+      S.personaOverrides = {};
       els.script.value = S.script;
       onScriptChange(true);
     };
@@ -610,6 +544,8 @@
     S.genders = {};
     S.mine = [];
     S.voiceOverrides = {};
+    S.aiVoiceOverrides = {};
+    S.personaOverrides = {};
     S.lyric = false;
     els.script.value = "";
     onScriptChange(true);
@@ -619,11 +555,10 @@
   els.play.addEventListener("click", function () {
     if (!parsed.lineCount) return;
     Stage.open({
-      items: parsed.items,
-      characters: parsed.characters,
+      parsed: parsed,
       mine: S.mine.slice(),
       genders: S.genders,
-      overrides: S.voiceOverrides,
+      personaOverrides: S.personaOverrides,
       title: S.title || "Your script",
       sub: S.mine.length
         ? "You: " + S.mine.map(function (k) { return Parser.titleCase(k); }).join(", ")
@@ -635,6 +570,12 @@
       cueOnly: S.mine.length ? S.cueOnly : false
     });
   });
+
+  function onAIFallback() {
+    toast("AI voices didn't load, so the free voices are taking over.");
+    renderEngineNote();
+    syncSegs();
+  }
 
   /* ============================================
      Tabs
@@ -694,8 +635,8 @@
   }
 
   function castList(e) {
-    var p = Parser.parse(e.script);
-    return p.characters.map(function (c) { return c.name; });
+    if (!e._cast) e._cast = Parser.parse(e.script).characters.map(function (c) { return c.name; });
+    return e._cast;
   }
 
   function renderResults() {
@@ -736,13 +677,11 @@
   });
 
   function performEntry(e) {
-    var p = Parser.parse(e.script);
     Stage.open({
-      items: p.items,
-      characters: p.characters,
+      parsed: Parser.parse(e.script),
       mine: [],
       genders: e.genders,
-      overrides: {},
+      personaOverrides: {},
       title: e.title,
       sub: e.scene,
       lyric: e.kind === "musical",
@@ -790,14 +729,13 @@
     var lastFocus = null;
 
     function isMine(it) {
-      if (it.type !== "line") return false;
+      if (!it || it.type !== "line") return false;
       for (var i = 0; i < it.chars.length; i++) if (R.mine[it.chars[i]]) return true;
       return !!R.mine[it.key];
     }
 
-    function voiceFor(it) {
-      if (it.type !== "line") return R.cast.__narrator;
-      return R.cast[it.chars[0]] || R.cast[it.key] || R.cast.__narrator;
+    function colorFor(it) {
+      return R.colors[it.chars[0]] || R.colors[it.key] || "var(--sp-stage-muted)";
     }
 
     /* "Just my cues": skip partner lines that don't lead into one of mine */
@@ -814,7 +752,49 @@
       return skip;
     }
 
-    function renderTextHTML(text, i, mine) {
+    /* Find the sound effects in each stage direction (and inside lines) */
+    function computeSfx() {
+      var out = [];
+      var allText = R.items.map(function (x) { return x.text; }).join(" ");
+      var magicWorld = SFX.magicWorld(allText);
+      var prevLine = null;
+      var prevEmo = null;
+      R.items.forEach(function (it, i) {
+        if (it.type === "dir") {
+          var others = true;
+          if (prevLine) {
+            var names = mentionedKeys(it.text);
+            others = names.some(function (k) { return prevLine.chars.indexOf(k) < 0; });
+          }
+          out[i] = SFX.detect(it.text, {
+            prevLine: prevLine ? prevLine.text : "",
+            prevShouted: !!(prevEmo && prevEmo.shout),
+            affectsOthers: others,
+            magicWorld: magicWorld
+          });
+          prevLine = null;
+        } else if (it.type === "line") {
+          var cues = (it.text.match(/\(([^)]*)\)|\[([^\]]*)\]/g) || []).join(" ");
+          out[i] = cues ? SFX.detect(cues, {}) : [];
+          prevLine = it;
+          prevEmo = R.emotions[i];
+        } else {
+          out[i] = [];
+        }
+      });
+      return out;
+    }
+
+    function mentionedKeys(text) {
+      var up = " " + String(text).toUpperCase() + " ";
+      return Object.keys(R.personas).filter(function (k) {
+        return k.split(/[\s\-]+/).some(function (t) {
+          return t.length >= 3 && new RegExp("[^A-Z]" + t.replace(/[^A-Z0-9]/g, "") + "[^A-Z]").test(up);
+        });
+      });
+    }
+
+    function renderTextHTML(text, mine) {
       var parts = String(text).split(/(\([^)]*\)|\[[^\]]*\])/);
       var html = "";
       var expected = [];
@@ -824,11 +804,9 @@
           html += '<span class="sp-inline-dir">' + esc(part) + "</span>";
           return;
         }
-        var lines = part.split("\n");
-        lines.forEach(function (ln, li) {
+        part.split("\n").forEach(function (ln, li) {
           if (li > 0) html += "<br>";
-          var toks = ln.split(/(\s+)/);
-          toks.forEach(function (tok) {
+          ln.split(/(\s+)/).forEach(function (tok) {
             if (!tok) return;
             if (/^\s+$/.test(tok)) { html += " "; return; }
             if (!mine) { html += esc(tok); return; }
@@ -843,6 +821,14 @@
       return { html: html, expected: expected };
     }
 
+    function whoLabel(it, mine) {
+      if (it.group) {
+        var names = it.chars.filter(function (k) { return R.personas[k]; }).map(function (k) { return Parser.titleCase(k); });
+        return esc(Parser.titleCase(it.group)) + (names.length ? ' <span class="sp-who-names">' + esc(names.join(", ")) + "</span>" : "");
+      }
+      return esc(Parser.titleCase(it.key));
+    }
+
     function render() {
       linesEl.innerHTML = "";
       R.expected = [];
@@ -851,22 +837,25 @@
         var d = document.createElement("div");
         d.className = "sp-item " + it.type;
         d.dataset.i = i;
+        var sfx = R.sfxOn ? R.sfx[i] : [];
+        var sfxHtml = sfx.length ? '<div class="sp-sfx-tag" aria-label="Sound effects">🔊 ' + esc(sfx.map(function (h) { return h.label; }).join(" → ")) + "</div>" : "";
         if (it.type === "line") {
           var mine = isMine(it);
-          var v = voiceFor(it);
           if (mine) d.classList.add("mine");
-          d.style.setProperty("--who-color", mine ? "var(--sp-gold)" : v.color);
-          var r = renderTextHTML(it.text, i, mine);
+          d.style.setProperty("--who-color", mine ? "var(--sp-gold)" : colorFor(it));
+          var r = renderTextHTML(it.text, mine);
           R.expected[i] = r.expected;
-          d.innerHTML = '<div class="sp-who">' + esc(Parser.titleCase(it.key)) + (mine ? '<span class="sp-you">YOU</span>' : "") + "</div>" +
-            '<div class="sp-text">' + r.html + "</div>";
+          var emo = R.emotions[i] && R.emotions[i].emotion;
+          var emoHtml = emo && !mine ? '<span class="sp-emo">' + esc(emo) + "</span>" : "";
+          d.innerHTML = '<div class="sp-who">' + whoLabel(it, mine) + (mine ? '<span class="sp-you">YOU</span>' : "") + emoHtml + "</div>" +
+            '<div class="sp-text">' + r.html + "</div>" + sfxHtml;
           if (mine) {
             R.wordEls[i] = d.querySelectorAll(".w[data-k]");
             if (R.maskMode === "hint") d.classList.add("mask-hint");
             if (R.maskMode === "hide") d.classList.add("mask-hide");
           }
         } else {
-          d.innerHTML = '<div class="sp-text">' + esc(it.text) + "</div>";
+          d.innerHTML = '<div class="sp-text">' + esc(it.text) + "</div>" + sfxHtml;
         }
         if (R.skip[i]) d.classList.add("skipped");
         linesEl.appendChild(d);
@@ -879,9 +868,7 @@
         n.classList.toggle("current", k === i);
         n.classList.toggle("past", k < i);
         n.classList.remove("speaking");
-        if (k < i && n.classList.contains("mine")) {
-          n.classList.remove("mask-hint", "mask-hide", "peek");
-        }
+        if (k < i && n.classList.contains("mine")) n.classList.remove("mask-hint", "mask-hide", "peek");
       });
       var node = R.nodes[i];
       if (node) {
@@ -908,8 +895,82 @@
 
     function stopAll() {
       R.token++;
-      Speech.cancel();
+      R.performer.cancel();
+      SFX.stopAll();
       clearWaits();
+    }
+
+    function wait(ms, t) {
+      return new Promise(function (res) {
+        R.waitTimer = setTimeout(function () { res(t === R.token); }, ms);
+      });
+    }
+
+    /* ---------- sound effects ---------- */
+
+    function sfxPrompt(i) {
+      var it = R.items[i];
+      var hits = R.sfx[i] || [];
+      var bits = [];
+      hits.forEach(function (h) {
+        if (h.implied) { bits.push("a cartoon magic spell being cast, sparkly zap"); return; }
+        var clause = it.type === "dir" ? (it.text.split(/[.;!?]/).filter(function (c) { return c.toLowerCase().indexOf(h.phrase.toLowerCase()) >= 0; })[0] || h.phrase) : h.phrase;
+        clause = clause.replace(/\b[A-Z][A-Z'\-]+(?:\s+[A-Z][A-Z'\-]+)*\b/g, "someone").replace(/someone(\s+and\s+someone)+/g, "two kids").replace(/\s+/g, " ").trim();
+        bits.push(clause);
+      });
+      var uniq = bits.filter(function (b, k) { return bits.indexOf(b) === k; });
+      return uniq.join(", then ") + ". Funny cartoon sound effects for a kids' play, no music, no talking.";
+    }
+
+    function sfxSeconds(i) {
+      var n = (R.sfx[i] || []).length;
+      return clamp(1.2 + n * 1.0, 1.5, 5);
+    }
+
+    function prefetchSfx(i) {
+      if (!R.sfxOn || !R.performer.useAI() || !(R.sfx[i] || []).length) return;
+      AI.fetchAudio(AI.sfxUrl(sfxPrompt(i), sfxSeconds(i))).catch(function () {});
+    }
+
+    function playSfx(i, t) {
+      var hits = R.sfx[i] || [];
+      if (!R.sfxOn || !hits.length) return Promise.resolve(true);
+      R.nodes[i].classList.add("sfx-playing");
+      var done = function (ok) {
+        if (R && R.nodes[i]) R.nodes[i].classList.remove("sfx-playing");
+        return ok;
+      };
+      if (R.performer.useAI()) {
+        var myGen = AI.gen();
+        return AI.fetchAudio(AI.sfxUrl(sfxPrompt(i), sfxSeconds(i))).then(function (buf) {
+          if (t !== R.token) return false;
+          return AI.playBuffer(buf, [], null, 0.9, 0, myGen).then(function () { return done(t === R.token); });
+        }).catch(function () {
+          return playSynth(hits, t).then(done);
+        });
+      }
+      return playSynth(hits, t).then(done);
+    }
+
+    function playSynth(hits, t) {
+      var ctx = Voices.Audio.get();
+      if (!ctx) return Promise.resolve(true);
+      SFX.init(ctx);
+      var secs = SFX.playAll(hits);
+      return wait(Math.min(secs, 3.5) * 1000 + 100, t);
+    }
+
+    /* ---------- running the scene ---------- */
+
+    function prefetchAhead(from) {
+      var n = 0;
+      for (var j = from; j < R.items.length && n < 4; j++) {
+        if (R.skip[j]) continue;
+        var it = R.items[j];
+        if (it.type === "line" && !isMine(it)) { R.performer.prefetch(it, R.emotions[j]); n++; }
+        else if (it.type === "dir" && R.readDirs) { R.performer.prefetch(it, {}); n++; }
+        prefetchSfx(j);
+      }
     }
 
     function step() {
@@ -920,35 +981,29 @@
       var i = R.idx;
       var it = R.items[i];
       setCurrent(i);
+      prefetchAhead(i + 1);
 
       if (it.type === "line" && isMine(it)) {
-        awaitUser(i, t);
+        playSfx(i, t).then(function (ok) { if (ok && t === R.token) awaitUser(i, t); });
         return;
       }
 
-      var spoken = it.type === "line" || R.readDirs;
       var text = it.type === "line" ? Parser.spokenText(it.text) : it.text;
-      if (!spoken || !text) {
-        R.waitTimer = setTimeout(function () { if (t === R.token) advance(); }, it.type === "heading" ? 700 : 350);
-        return;
-      }
+      var hasSfx = R.sfxOn && (R.sfx[i] || []).length;
+      var speakIt = it.type === "line" ? !!text : (R.readDirs && !!text);
 
-      if (!Speech.supported) {
-        var secs = 1.2 + text.split(/\s+/).length * 0.33 / R.rate;
-        R.waitTimer = setTimeout(function () { if (t === R.token) advance(); }, secs * 1000);
-        return;
-      }
-
-      var v = voiceFor(it);
-      R.nodes[i].classList.add("speaking");
-      Speech.speak(text, {
-        voice: v.voice,
-        pitch: v.pitch,
-        rate: R.rate * (it.type === "line" ? 1 : 1.05),
-        lyric: R.lyric && it.type === "line",
-        volume: it.type === "line" ? 1 : 0.85
-      }).then(function () {
-        if (t !== R.token) return;
+      var p = playSfx(i, t);
+      p.then(function (ok) {
+        if (!ok || t !== R.token) return false;
+        if (!speakIt) return wait(hasSfx ? 150 : it.type === "heading" ? 700 : 350, t);
+        if (it.type === "line" && !Browser.supported && R.performer.engine !== "ai") {
+          var secs = 1.2 + text.split(/\s+/).length * 0.33 / R.rate;
+          return wait(secs * 1000, t);
+        }
+        R.nodes[i].classList.add("speaking");
+        return R.performer.speak(it, R.emotions[i] || {}).then(function () { return t === R.token; });
+      }).then(function (ok) {
+        if (!ok || t !== R.token) return;
         R.nodes[i].classList.remove("speaking");
         R.waitTimer = setTimeout(function () { if (t === R.token) advance(); }, 180);
       });
@@ -958,12 +1013,15 @@
       turn.classList.remove("hidden");
       nextBtn.classList.add("your-turn");
       nextBtn.innerHTML = "Done &#9654;";
+      var it = R.items[i];
+      var others = it.group ? it.chars.filter(function (k) { return !R.mine[k]; }) : [];
+      var together = others.length ? " Say it together with " + others.map(function (k) { return Parser.titleCase(k); }).join(", ") + "." : "";
       var mode = R.turnMode;
 
       if (mode === "timed") {
         var words = (R.expected[i] || []).length;
         var ms = (1500 + words * 430) / R.rate;
-        turnText.textContent = "Your line! Moving on in a moment…";
+        turnText.textContent = "Your line!" + together + " Moving on in a moment…";
         requestAnimationFrame(function () {
           turnFill.style.transition = "width " + ms + "ms linear";
           turnFill.style.width = "100%";
@@ -974,7 +1032,7 @@
 
       if (mode === "listen" && Listener.supported) {
         turn.classList.add("listening");
-        turnText.textContent = "Listening… say your line";
+        turnText.textContent = "Listening… say your line" + (together ? " (together!)" : "");
         var expected = R.expected[i] || [];
         var spans = R.wordEls[i] || [];
         var st = { heard: false, last: Date.now(), cov: 0, done: false };
@@ -1018,7 +1076,7 @@
         return;
       }
 
-      turnText.textContent = "Your line! Tap Done when you've said it.";
+      turnText.textContent = "Your line!" + together + " Tap Done when you've said it.";
     }
 
     function advance() {
@@ -1061,6 +1119,10 @@
       }
       $("sp-curtain-stats").textContent = msg;
       curtain.classList.remove("hidden");
+      if (R.sfxOn) {
+        var ctx = Voices.Audio.get();
+        if (ctx) { SFX.init(ctx); SFX.play("applause"); }
+      }
       setTimeout(function () {
         scroller.scrollTo({ top: curtain.offsetTop - scroller.clientHeight * 0.25, behavior: "smooth" });
       }, 50);
@@ -1083,33 +1145,51 @@
 
     function open(cfg) {
       lastFocus = document.activeElement;
+      /* Unlock audio first: phones only allow sound that starts from a tap */
+      Voices.Audio.unlock();
+      Browser.unlock();
+      var ctx = Voices.Audio.get();
+      if (ctx) SFX.init(ctx);
+
       var mine = {};
       cfg.mine.forEach(function (k) { mine[k] = true; });
+      var personas = personasFor(cfg.parsed, cfg.genders, cfg.personaOverrides);
       R = {
-        items: cfg.items,
+        items: cfg.parsed.items,
         mine: mine,
-        cast: buildCast(cfg.characters.map(function (c) { return c.key; }), cfg.genders || {}, cfg.overrides || {}),
+        personas: personas,
+        emotions: Director.emotions(cfg.parsed, personas),
+        colors: colorMap(cfg.parsed.characters),
         rate: S.rate,
-        lyric: !!cfg.lyric,
         readDirs: !!cfg.readDirs,
         maskMode: cfg.maskMode,
         turnMode: cfg.turnMode,
         cueOnly: !!cfg.cueOnly,
+        sfxOn: S.sfx,
         idx: 0,
         token: 0,
         playing: false,
         scores: {}
       };
+      R.performer = new Voices.Performer({
+        engine: engineNow(),
+        personas: personas,
+        rate: S.rate,
+        lyric: !!cfg.lyric,
+        browserOverrides: S.voiceOverrides,
+        aiOverrides: S.aiVoiceOverrides
+      });
+      R.performer.onFallback = onAIFallback;
       R.skip = computeSkips();
+      R.sfx = computeSfx();
       $("sp-stage-title").textContent = cfg.title;
-      $("sp-stage-sub").textContent = cfg.sub || "";
+      $("sp-stage-sub").textContent = (cfg.sub || "") + (R.performer.useAI() ? " · ✨ AI voices" : "");
       syncRateSelect();
       curtain.classList.add("hidden");
       render();
       stage.hidden = false;
       document.body.classList.add("sp-stage-open");
       requestWake();
-      Speech.unlock();
       setPlaying(true);
       scroller.scrollTop = 0;
       step();
@@ -1137,7 +1217,7 @@
         if (bd > 0.02) {
           var o = document.createElement("option");
           o.value = String(R.rate);
-          o.textContent = R.rate.toFixed(2).replace(/0$/, "") + "×";
+          o.textContent = fmtRate(R.rate);
           stageRate.appendChild(o);
           stageRate.value = o.value;
         } else stageRate.value = best.value;
@@ -1147,7 +1227,7 @@
     /* Controls */
     nextBtn.addEventListener("click", function () {
       if (!R) return;
-      if (!R.playing) { setPlaying(true); }
+      if (!R.playing) setPlaying(true);
       var it = R.items[R.idx];
       if (it && isMine(it) && R.turnMode === "listen") {
         var spans = R.wordEls[R.idx] || [];
@@ -1172,7 +1252,8 @@
       } else {
         if (R.idx >= R.items.length) R.idx = 0;
         curtain.classList.add("hidden");
-        Speech.unlock();
+        Voices.Audio.unlock();
+        Browser.unlock();
         setPlaying(true);
         step();
       }
@@ -1187,13 +1268,14 @@
       if (!R) return;
       R.scores = {};
       R.nodes.forEach(function (n) {
-        n.querySelectorAll(".w").forEach(function (w) { w.classList.remove("heard", "missed"); });
+        Array.prototype.forEach.call(n.querySelectorAll(".w"), function (w) { w.classList.remove("heard", "missed"); });
         if (n.classList.contains("mine")) {
           if (R.maskMode === "hint") n.classList.add("mask-hint");
           if (R.maskMode === "hide") n.classList.add("mask-hide");
         }
       });
-      Speech.unlock();
+      Voices.Audio.unlock();
+      Browser.unlock();
       setPlaying(true);
       goTo(0);
     });
@@ -1205,9 +1287,10 @@
     stageRate.addEventListener("change", function () {
       if (!R) return;
       R.rate = parseFloat(stageRate.value);
+      R.performer.rate = R.rate;
       S.rate = R.rate;
       els.rate.value = S.rate;
-      els.rateOut.textContent = S.rate.toFixed(2).replace(/0$/, "") + "×";
+      els.rateOut.textContent = fmtRate(S.rate);
       persist();
     });
 
@@ -1224,7 +1307,8 @@
         node.classList.toggle("peek");
         return;
       }
-      Speech.unlock();
+      Voices.Audio.unlock();
+      Browser.unlock();
       setPlaying(true);
       goTo(i);
     });
@@ -1262,21 +1346,24 @@
     t.textContent = msg;
     t.classList.remove("hidden");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 3200);
+    toastTimer = setTimeout(function () { t.classList.add("hidden"); }, 3600);
   }
 
   /* ============================================
      Init
      ============================================ */
 
-  if (!Speech.supported) $("sp-no-speech").classList.remove("hidden");
+  if (!Browser.supported) $("sp-no-speech").classList.remove("hidden");
   fillSamples();
   initSegs();
   renderTurnNote();
+  renderEngineNote();
   renderChips();
   renderStatus();
   renderVoices();
   renderResults();
-  Speech.onVoices(function () { renderVoices(); });
+  Browser.onVoices(function () { renderVoices(); });
+  AI.onChange(function () { syncSegs(); renderEngineNote(); renderVoices(); });
+  AI.check();
   if (location.hash === "#perform") showTab("perform");
 })();

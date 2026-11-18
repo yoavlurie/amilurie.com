@@ -60,7 +60,8 @@ ROMEO: She speaks."></textarea>
               <li><strong>NAME: line</strong> &mdash; <code>HAMLET: To be, or not to be</code></li>
               <li><strong>NAME. line</strong> &mdash; the style used by most free Shakespeare texts</li>
               <li><strong>Screenplay style</strong> &mdash; the character name in CAPS on its own line, with their dialogue underneath</li>
-              <li>Anything in <code>(parentheses)</code> or <code>[brackets]</code> is a stage direction and won't be read as dialogue.</li>
+              <li>Anything in <code>(parentheses)</code> or <code>[brackets]</code> is a stage direction. Scene Partner uses it to know who's onstage, how lines should sound (<code>WAYNE (deadpan): he's dead</code>), and which sound effects to play.</li>
+              <li><code>ALL:</code> means everyone onstage. <code>ALL (except FIRST HEADMASTER):</code> leaves someone out.</li>
               <li>Copying from a PDF? Paste it in, then check the character list below looks right.</li>
             </ul>
           </details>
@@ -73,8 +74,8 @@ ROMEO: She speaks."></textarea>
           </div>
           <p class="sp-muted" id="sp-cast-hint">Paste a script above and the characters will show up here.</p>
           <div class="sp-chips" id="sp-chips" role="group" aria-label="Your characters"></div>
-          <details class="sp-help" id="sp-voices-box">
-            <summary>Scene partner voices</summary>
+          <details class="sp-help sp-cast-box" id="sp-voices-box">
+            <summary>Who's who &amp; their voices</summary>
             <div id="sp-voices"></div>
           </details>
         </div>
@@ -84,6 +85,15 @@ ROMEO: She speaks."></textarea>
             <span class="sp-step-num">3</span>
             <h2>How do you want to rehearse?</h2>
           </div>
+
+          <div class="sp-setting">
+            <span class="sp-setting-label">Voices</span>
+            <div class="sp-seg" role="radiogroup" aria-label="Voices" data-setting="engine">
+              <button type="button" role="radio" data-value="ai" id="sp-engine-ai">AI voices &#10024;</button>
+              <button type="button" role="radio" data-value="browser">Free voices</button>
+            </div>
+          </div>
+          <p class="sp-muted sp-small sp-engine-note" id="sp-engine-note"></p>
 
           <div class="sp-setting">
             <span class="sp-setting-label">My lines</span>
@@ -118,6 +128,11 @@ ROMEO: She speaks."></textarea>
               <output id="sp-rate-out" for="sp-rate">1.0&times;</output>
             </div>
           </div>
+
+          <label class="sp-check">
+            <input type="checkbox" id="sp-sfx">
+            <span>Sound effects &#128266;</span>
+          </label>
 
           <label class="sp-check">
             <input type="checkbox" id="sp-readdirs">
@@ -205,6 +220,9 @@ ROMEO: She speaks."></textarea>
   <script src="assets/script.js" defer></script>
   <script src="assets/scene-partner/library.js"></script>
   <script src="assets/scene-partner/parser.js"></script>
+  <script src="assets/scene-partner/director.js"></script>
+  <script src="assets/scene-partner/sfx.js"></script>
+  <script src="assets/scene-partner/voices.js"></script>
   <script src="assets/scene-partner/app.js" defer></script>
 </body>
 </html>
